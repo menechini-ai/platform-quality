@@ -1,6 +1,6 @@
 """SQLAlchemy models package."""
 
-from app.core.db import Base
+from app.core.db import Base as Base  # noqa: F401
 from app.core.models.health import HealthSnapshot, Slo  # noqa: F401, F403
 
 # Import all models so Alembic can discover them

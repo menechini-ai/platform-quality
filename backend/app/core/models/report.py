@@ -7,7 +7,6 @@ from datetime import datetime, timezone
 
 from sqlalchemy import Column, DateTime, JSON, String, Text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import DeclarativeBase
 
 from app.core.db import Base
 

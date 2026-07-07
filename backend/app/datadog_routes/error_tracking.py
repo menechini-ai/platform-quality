@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 
 from app.datadog.client import DatadogClient
 

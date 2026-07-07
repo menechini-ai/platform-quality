@@ -10,7 +10,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.models.incident import Incident
-from app.core.models.maturity import MaturityAssessment
 from app.core.models.report import Report
 from app.core.models.rca import RcaReport
 
