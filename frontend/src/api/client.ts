@@ -2,12 +2,20 @@ import { useQuery } from "@tanstack/react-query";
 
 const API_BASE = "/api/v1";
 
-async function fetchJSON<T>(url: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${url}`);
+async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE}${url}`, options);
   if (!res.ok) {
     throw new Error(`API error: ${res.status} ${res.statusText}`);
   }
   return res.json();
+}
+
+// Generic API helper (used by Maturity/Reports pages)
+export async function api<T = unknown>(url: string, options?: RequestInit): Promise<T> {
+  return fetchJSON<T>(url, {
+    headers: { "Content-Type": "application/json" },
+    ...options,
+  });
 }
 
 // ─── Incidents ─────────────────────────────────────────

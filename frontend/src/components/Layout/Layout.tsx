@@ -9,6 +9,8 @@ import {
   Menu,
   X,
   Shield,
+  TrendingUp,
+  FileText,
 } from "lucide-react";
 import { useState } from "react";
 import { clsx } from "clsx";
@@ -19,6 +21,8 @@ const navItems = [
   { to: "/rca", icon: Search, label: "RCA" },
   { to: "/health", icon: HeartPulse, label: "Health" },
   { to: "/self-healing", icon: Wrench, label: "Self-Healing" },
+  { to: "/maturity", icon: TrendingUp, label: "Maturity" },
+  { to: "/reports", icon: FileText, label: "Reports" },
 ];
 
 export function Layout() {

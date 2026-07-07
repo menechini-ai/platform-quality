@@ -6,6 +6,8 @@ import { IncidentDetailPage } from "@/components/Incidents/IncidentDetailPage";
 import { RCAPage } from "@/components/RCA/RCAPage";
 import { HealthPage } from "@/components/Health/HealthPage";
 import { SelfHealingPage } from "@/components/SelfHealing/SelfHealingPage";
+import { MaturityPage } from "@/components/Maturity/MaturityPage";
+import { ReportsPage } from "@/components/Reports/ReportsPage";
 
 export default function App() {
   return (
@@ -18,6 +20,8 @@ export default function App() {
           <Route path="/rca" element={<RCAPage />} />
           <Route path="/health" element={<HealthPage />} />
           <Route path="/self-healing" element={<SelfHealingPage />} />
+          <Route path="/maturity" element={<MaturityPage />} />
+          <Route path="/reports" element={<ReportsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

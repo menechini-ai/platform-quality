@@ -41,6 +41,8 @@ def create_app() -> FastAPI:
     # Routers
     from app.health.router import router as health_router
     from app.incidents.router import router as incidents_router
+    from app.maturity.router import router as maturity_router
+    from app.maturity.router_reports import router as reports_router
     from app.rca.router import router as rca_router
     from app.self_healing.router import router as self_healing_router
 
@@ -49,6 +51,8 @@ def create_app() -> FastAPI:
     app.include_router(rca_router, prefix=prefix, tags=["rca"])
     app.include_router(health_router, prefix=prefix, tags=["health"])
     app.include_router(self_healing_router, prefix=prefix, tags=["self-healing"])
+    app.include_router(maturity_router, prefix=prefix, tags=["maturity"])
+    app.include_router(reports_router, prefix=prefix, tags=["reports"])
 
     @app.get("/health")
     async def health_check():

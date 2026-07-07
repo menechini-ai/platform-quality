@@ -17,3 +17,5 @@ from app.core.schemas.self_healing import (  # noqa: F401, F403
     RunbookCreate,
     RunbookRead,
 )
+from app.core.schemas.maturity import MaturityAssessmentRead  # noqa: F401, F403
+from app.core.schemas.report import ReportCreate, ReportRead  # noqa: F401, F403
