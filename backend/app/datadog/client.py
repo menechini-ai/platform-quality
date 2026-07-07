@@ -20,6 +20,7 @@ from datadog_api_client.v1.api.monitors_api import MonitorsApi
 from datadog_api_client.v1.api.service_level_objectives_api import ServiceLevelObjectivesApi
 from datadog_api_client.v2.api.incidents_api import IncidentsApi
 from datadog_api_client.v2.api.logs_api import LogsApi
+from datadog_api_client.v2.api.spans_api import SpansApi
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.core.config import settings
@@ -60,6 +61,7 @@ class DatadogClient:
         self.slos = ServiceLevelObjectivesApi(self._api_client)
         self.incidents = IncidentsApi(self._api_client)
         self.logs = LogsApi(self._api_client)
+        self.spans = SpansApi(self._api_client)
 
     @retry(
         stop=stop_after_attempt(3),
@@ -106,6 +108,68 @@ class DatadogClient:
 
         body = EventCreateRequest(title=title, text=text, **kwargs)
         response = self.events.create_event(body=body)
+        return response.to_dict()
+
+    def list_spans(self, query: str, **kwargs: Any) -> dict[str, Any]:
+        """Search APM spans (V2 SpansApi)."""
+        from datadog_api_client.v2.model.spans_list_request import SpansListRequest
+
+        body = {"filter": {"query": query}, **kwargs}
+        request = SpansListRequest(**body)
+        response = self.spans.list_spans(body=request)
+        return response.to_dict()
+
+    def aggregate_spans(self, **kwargs: Any) -> dict[str, Any]:
+        """Aggregate APM spans."""
+        from datadog_api_client.v2.model.spans_aggregate_request import SpansAggregateRequest
+
+        body_filter = {"query": kwargs.pop("filter_query", None)}
+        compute = kwargs.pop("compute", None)
+        group_by = kwargs.pop("group_by", None)
+
+        body = {}
+        if body_filter["query"]:
+            body["filter"] = body_filter
+        if compute:
+            from datadog_api_client.v2.model.spans_aggregate_request_compute import SpansAggregateRequestCompute
+
+            body["compute"] = [SpansAggregateRequestCompute(**compute)]
+        if group_by:
+            body["group_by"] = group_by
+        # Pass timestamps
+        for key in ("filter_from", "filter_to"):
+            val = kwargs.pop(key, None)
+            if val is not None and "filter" in body:
+                body["filter"][key.replace("filter_", "")] = val
+
+        request = SpansAggregateRequest(**body) if body else SpansAggregateRequest()
+        response = self.spans.aggregate_spans(body=request)
+        return response.to_dict()
+
+    def aggregate_logs(self, **kwargs: Any) -> dict[str, Any]:
+        """Aggregate logs count by group_by facets."""
+        from datadog_api_client.v2.model.logs_aggregate_request import LogsAggregateRequest
+
+        body_filter = {"query": kwargs.pop("filter_query", None)}
+        compute = kwargs.pop("compute", None)
+        group_by = kwargs.pop("group_by", None)
+
+        body = {}
+        if body_filter["query"]:
+            body["filter"] = body_filter
+        if compute:
+            from datadog_api_client.v2.model.logs_aggregate_request_compute import LogsAggregateRequestCompute
+
+            body["compute"] = [LogsAggregateRequestCompute(**compute)]
+        if group_by:
+            body["group_by"] = group_by
+        for key in ("filter_from", "filter_to"):
+            val = kwargs.pop(key, None)
+            if val is not None and "filter" in body:
+                body["filter"][key.replace("filter_", "")] = val
+
+        request = LogsAggregateRequest(**body) if body else LogsAggregateRequest()
+        response = self.logs.aggregate_logs(body=request)
         return response.to_dict()
 
     def close(self) -> None:

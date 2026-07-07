@@ -20,3 +20,8 @@ def test_client_initialization():
     assert hasattr(client, "incidents")
     assert hasattr(client, "slos")
     assert hasattr(client, "logs")
+    assert hasattr(client, "spans")
+    assert hasattr(client, "events")
+    assert hasattr(client, "list_spans")
+    assert hasattr(client, "aggregate_logs")
+    assert hasattr(client, "aggregate_spans")
