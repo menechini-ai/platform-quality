@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.datadog.client import DatadogClient
 from app.datadog.formatters import fmt_slos, maybe_human
-from app.datadog.write_guard import sanitize_error_message
+from app.datadog.write_guard import assert_write_allowed, sanitize_error_message
 
 router = APIRouter()
 
@@ -33,7 +33,6 @@ async def list_datadog_slos(
         raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
 
 
-# Static paths BEFORE param paths
 @router.get("/datadog/slos/corrections")
 async def list_slo_corrections(
     slo_id: str | None = None,
@@ -61,6 +60,27 @@ async def get_datadog_slo(slo_id: str):
         return r.to_dict()
     except Exception as e:
         raise HTTPException(status_code=404, detail=sanitize_error_message(str(e))) from e
+
+
+@router.post("/datadog/slos", status_code=201)
+async def create_datadog_slo(
+    name: str,
+    monitor_ids: list[int],
+    target: float = 99.0,
+    warning: float | None = None,
+    timeframe: str = "30d",
+    tags: list[str] | None = None,
+):
+    """Create a Datadog SLO from existing monitors."""
+    assert_write_allowed()
+    client = DatadogClient()
+    try:
+        r = client.create_slo(name, monitor_ids, target, warning, timeframe, tags)
+        if not r:
+            raise HTTPException(status_code=500, detail="SLO creation returned no data")
+        return r
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=sanitize_error_message(str(e))) from e
 
 
 @router.get("/datadog/slos/{slo_id}/history")

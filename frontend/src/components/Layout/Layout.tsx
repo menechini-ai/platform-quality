@@ -31,6 +31,7 @@ const navItems = [
   { to: "/health", icon: HeartPulse, label: "Health" },
   { to: "/maturity", icon: Activity, label: "Maturity" },
   { to: "/reports", icon: FileText, label: "Reports" },
+  { to: "/self-healing", icon: Activity, label: "Self-Healing" },
 ];
 
 function VitalSigns() {

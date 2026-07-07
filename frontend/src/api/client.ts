@@ -361,3 +361,131 @@ export function useActions(filters?: { status?: string }) {
     queryFn: () => fetchJSON(`/actions?${params}`),
   });
 }
+
+// ─── Health Catalog / Stats / KB / Analysis ────────────
+
+export interface CatalogItem {
+  type: string;
+  id: string;
+  name: string;
+  service?: string;
+  severity?: string;
+  status?: string;
+  failure_pattern?: string;
+  tags: string[];
+  [key: string]: unknown;
+}
+
+export interface HealthStats {
+  total_incidents: number;
+  active_incidents: number;
+  incidents_without_rca: number;
+  by_service: Record<string, number>;
+  by_failure_pattern: Record<string, number>;
+  by_severity: Record<string, number>;
+  by_status: Record<string, number>;
+  reports_by_type: Record<string, number>;
+  total_runbooks: number;
+  heal_actions_by_status: Record<string, number>;
+  total_slos: number;
+}
+
+export interface KbEntry {
+  id: string;
+  title: string;
+  symptom_pattern?: string;
+  root_cause?: string;
+  resolution_steps?: string[];
+  tags: string[];
+  created_at: string;
+}
+
+export interface AnalysisResult {
+  id: string;
+  domain: string;
+  action: string;
+  title: string;
+  summary?: string;
+  findings?: Record<string, unknown>;
+  recommendations?: string[];
+  score?: number;
+  severity?: string;
+  created_at: string;
+}
+
+export function useHealthCatalog(days?: number) {
+  const params = days ? `?days=${days}` : "";
+  return useQuery<CatalogItem[]>({
+    queryKey: ["health-catalog", days],
+    queryFn: () => fetchJSON(`/health/catalog${params}`),
+    refetchInterval: 30_000,
+  });
+}
+
+export function useHealthStats(days?: number) {
+  const params = days ? `?days=${days}` : "";
+  return useQuery<HealthStats>({
+    queryKey: ["health-stats", days],
+    queryFn: () => fetchJSON(`/health/stats${params}`),
+    refetchInterval: 30_000,
+  });
+}
+
+export function useKnowledgeBase(tag?: string) {
+  const params = tag ? `?tag=${tag}` : "";
+  return useQuery<KbEntry[]>({
+    queryKey: ["kb", tag],
+    queryFn: () => fetchJSON(`/kb${params}`),
+  });
+}
+
+export function useAnalysisResults(domain?: string) {
+  const params = domain ? `?domain=${domain}` : "";
+  return useQuery<AnalysisResult[]>({
+    queryKey: ["analysis", domain],
+    queryFn: () => fetchJSON(`/analysis${params}`),
+  });
+}
+
+export interface ServiceForecast {
+  service: string;
+  total: number;
+  mtbf_hours: number | null;
+  next_incident_estimate: string | null;
+  by_pattern: Record<string, number>;
+  last_incident: string | null;
+}
+
+export interface SloBurn {
+  name: string;
+  service: string | null;
+  target: number;
+  burn_rate: number | null;
+  error_budget_remaining_pct: number | null;
+  days_to_exhaustion: number | null;
+}
+
+export interface ServiceRisk {
+  service: string;
+  score: number;
+  level: "low" | "medium" | "high";
+  reasons: string[];
+  mtbf_hours: number | null;
+  next_incident_estimate: string | null;
+}
+
+export interface HealthForecast {
+  window_days: number;
+  frequency: ServiceForecast[];
+  slo_burn: SloBurn[];
+  risk: ServiceRisk[];
+  generated_at: string;
+}
+
+export function useHealthForecast(days: number = 30) {
+  return useQuery<HealthForecast>({
+    queryKey: ["health-forecast", days],
+    queryFn: () => fetchJSON(`/health/forecast?days=${days}`),
+    refetchInterval: 60_000,
+  });
+}

@@ -35,3 +35,10 @@ pgdata/
 
 # Celery
 celerybeat-schedule
+
+# SQLite databases
+*.db
+*.sqlite3
+
+# API demo scripts (standalone, not part of the app)
+api-demo/

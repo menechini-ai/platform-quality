@@ -3,7 +3,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import Column, DateTime, ForeignKey, String, Text
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -21,6 +21,8 @@ class Incident(Base):
     severity = Column(String(20), nullable=False, default="SEV-3")  # SEV-1..5
     status = Column(String(30), nullable=False, default="active")  # active, stable, resolved
     service = Column(String(200), nullable=True, index=True)
+    failure_pattern = Column(String(50), nullable=True, index=True)  # deploy, resource, latency, dependency, data_corruption
+    tags = Column(JSON, nullable=True, default=list)
     started_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
     resolved_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))

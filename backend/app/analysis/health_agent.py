@@ -32,24 +32,31 @@ async def analyze_health(
     slos_at_risk = 0
     slos_violated = 0
     for slo in slos:
-        score = slo.target
-        if score < slo.target * 0.9:
+        # Find latest health snapshot for this SLO's service
+        snap = (await db.execute(
+            select(HealthSnapshot)
+            .where(HealthSnapshot.service == slo.service)
+            .order_by(HealthSnapshot.snapshot_at.desc())
+            .limit(1)
+        )).scalar_one_or_none()
+        current = snap.current_value if snap else slo.target * 1.05  # assume healthy if no data
+        if current < slo.target * 0.9:
             slos_violated += 1
             findings.append({
                 "type": "slo_violation",
                 "slo_id": str(slo.id),
                 "name": slo.name,
                 "target": slo.target,
-                "current": score,
+                "current": current,
             })
-        elif score < slo.target:
+        elif current < slo.target:
             slos_at_risk += 1
             findings.append({
                 "type": "slo_at_risk",
                 "slo_id": str(slo.id),
                 "name": slo.name,
                 "target": slo.target,
-                "current": score,
+                "current": current,
             })
 
     if slos_violated:

@@ -49,6 +49,8 @@ class DatadogClient:
         config.api_key["apiKeyAuth"] = settings.DATADOG_API_KEY or ""
         config.api_key["appKeyAuth"] = settings.DATADOG_APP_KEY or ""
         config.server_variables["site"] = settings.DATADOG_SITE
+        config.unstable_operations["list_incidents"] = True
+        config.unstable_operations["search_incidents"] = True
 
         if not settings.DATADOG_API_KEY or not settings.DATADOG_APP_KEY:
             logger.warning("Datadog API / APP keys not configured — client will fail on calls")
@@ -80,8 +82,17 @@ class DatadogClient:
 
     def list_incidents(self, **kwargs: Any) -> list[dict[str, Any]]:
         """List Datadog incidents."""
+        # Map page_number -> page_offset for SDK
+        if "page_number" in kwargs:
+            kwargs["page_offset"] = kwargs.pop("page_number")
         response = self.incidents.list_incidents(**kwargs)
-        return [i.to_dict() for i in (response.to_dict().get("data", []))]
+        # Unstable operations return raw dict, not SDK wrapper
+        if hasattr(response, "to_dict"):
+            raw = response.to_dict()
+            data = raw.get("data", [])
+            return [i.to_dict() if hasattr(i, "to_dict") else i for i in data]
+        data = response.get("data", [])
+        return [i.to_dict() if hasattr(i, "to_dict") else i for i in data]
 
     def get_incident(self, incident_id: str) -> dict[str, Any]:
         """Get a single incident by ID."""
@@ -98,15 +109,37 @@ class DatadogClient:
         from datetime import datetime
 
         from datadog_api_client.v2.model.logs_list_request import LogsListRequest
+        from datadog_api_client.v2.model.logs_list_request_page import (
+            LogsListRequestPage,
+        )
+        from datadog_api_client.v2.model.logs_query_filter import LogsQueryFilter
+        from datadog_api_client.v2.model.logs_sort import LogsSort
 
-        filt: dict[str, Any] = {"query": query}
+        filt = LogsQueryFilter(query=query)
+        page = LogsListRequestPage()
+
         if "filter_from" in kwargs:
             val = kwargs.pop("filter_from")
-            filt["from"] = val.isoformat() if isinstance(val, datetime) else val
+            filt._from = val.isoformat() if isinstance(val, datetime) else val
         if "filter_to" in kwargs:
             val = kwargs.pop("filter_to")
-            filt["to"] = val.isoformat() if isinstance(val, datetime) else val
-        body = {"filter": filt, **kwargs}
+            filt.to = val.isoformat() if isinstance(val, datetime) else val
+        if "indexes" in kwargs:
+            filt.indexes = kwargs.pop("indexes")
+        if "limit" in kwargs:
+            page.limit = kwargs.pop("limit")
+
+        body = {"filter": filt, "page": page}
+
+        if "sort" in kwargs:
+            sort_val = kwargs.pop("sort")
+            if sort_val == "-timestamp":
+                body["sort"] = LogsSort.TIMESTAMP_DESCENDING
+            elif sort_val == "timestamp":
+                body["sort"] = LogsSort.TIMESTAMP_ASCENDING
+            elif isinstance(sort_val, LogsSort):
+                body["sort"] = sort_val
+
         request = LogsListRequest(**body)
         response = self.logs.list_logs(body=request)
         return response.to_dict()
@@ -114,7 +147,31 @@ class DatadogClient:
     def list_slos(self, **kwargs: Any) -> list[dict[str, Any]]:
         """List all SLOs."""
         response = self.slos.list_slos(**kwargs)
-        return [s.to_dict() for s in (response.to_dict().get("data", []))]
+        raw = response.to_dict()
+        data = raw.get("data", [])
+        return [s.to_dict() if hasattr(s, "to_dict") else s for s in data]
+
+    def create_slo(
+        self, name: str, monitor_ids: list[int], target: float = 99.0,
+        warning: float | None = None, timeframe: str = "30d", tags: list[str] | None = None,
+    ) -> dict[str, Any] | None:
+        """Create a monitor-based SLO. Warning must be > target."""
+        if not self._api_client:
+            return None
+        from datadog_api_client.v1.model.service_level_objective_request import (
+            ServiceLevelObjectiveRequest,
+        )
+        if warning is not None and warning <= target:
+            warning = target + 0.5
+        body = ServiceLevelObjectiveRequest(
+            type="monitor",
+            name=name,
+            thresholds=[{"target": target, "timeframe": timeframe, "warning": warning or target + 0.5}],
+            monitor_ids=monitor_ids,
+            tags=tags or ["team:observai"],
+        )
+        response = self.slos.create_slo(body=body)
+        return response.to_dict()
 
     def create_event(self, title: str, text: str, **kwargs: Any) -> dict[str, Any]:
         """Post an event to Datadog."""

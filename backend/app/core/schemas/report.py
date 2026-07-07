@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 class ReportCreate(BaseModel):
     report_type: str = Field(..., pattern=r"^(executive|monthly|team_health|postmortem|investigation)$")
     title: str = Field(..., max_length=500)
+    content: str | None = None
     incident_id: str | None = None
     tags: list[str] = []
 

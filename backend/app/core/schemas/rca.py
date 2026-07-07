@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -20,10 +21,10 @@ class RcaReportRead(BaseModel):
     incident_id: uuid.UUID
     summary: str | None = None
     root_cause: str | None = None
-    timeline: dict | None = None
-    metrics_snapshot: dict | None = None
-    logs_snapshot: dict | None = None
-    changes: dict | None = None
+    timeline: Any | None = None
+    metrics_snapshot: Any | None = None
+    logs_snapshot: Any | None = None
+    changes: Any | None = None
     recommendations: list[str] | None = None
     similar_incidents: list[str] | None = None
     created_at: datetime

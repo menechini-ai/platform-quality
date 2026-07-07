@@ -50,6 +50,19 @@ async def create_report(
     db: AsyncSession = Depends(get_db),
 ):
     """Create a report manually (use /reports/postmortem/:id for auto-generated)."""
+    if data.content:
+        # Free-form report with custom content
+        report = Report(
+            report_type=data.report_type,
+            title=data.title,
+            content=data.content,
+            tags=data.tags,
+            metadata_={"incident_id": data.incident_id} if data.incident_id else {},
+        )
+        db.add(report)
+        await db.flush()
+        await db.refresh(report)
+        return report
     report = await generate_report(
         db,
         data.report_type,

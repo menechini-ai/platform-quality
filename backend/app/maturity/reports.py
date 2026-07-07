@@ -154,7 +154,7 @@ async def generate_postmortem(
 
     timeline = (
         "\n".join(
-            f"- {e.occurred_at.strftime('%H:%M UTC')} — {e.event_type}: {e.content}"
+            f"- {e.created_at.strftime('%H:%M UTC')} — {e.event_type}: {e.content}"
             for e in getattr(incident, "timeline", [])
         )
         or "No timeline recorded"

@@ -26,6 +26,7 @@ async def list_incidents(
     status: str | None = Query(None, pattern=r"^(active|stable|resolved)$"),
     severity: str | None = Query(None, pattern=r"^SEV-[1-5]$"),
     service: str | None = None,
+    failure_pattern: str | None = Query(None, pattern=r"^(deploy|resource|latency|dependency|data_corruption)$"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
@@ -38,6 +39,8 @@ async def list_incidents(
         stmt = stmt.where(Incident.severity == severity)
     if service:
         stmt = stmt.where(Incident.service == service)
+    if failure_pattern:
+        stmt = stmt.where(Incident.failure_pattern == failure_pattern)
     stmt = stmt.offset(offset).limit(limit)
     result = await db.execute(stmt)
     return result.scalars().all()
@@ -45,22 +48,30 @@ async def list_incidents(
 
 @router.get("/incidents/summary")
 async def incident_summary(db: AsyncSession = Depends(get_db)):
-    """Return counts by severity and status."""
-    severity_counts = (
-        await db.execute(
-            select(Incident.severity, func.count(Incident.id).label("count"))
-            .group_by(Incident.severity)
-        )
-    ).all()
-    status_counts = (
-        await db.execute(
-            select(Incident.status, func.count(Incident.id).label("count"))
-            .group_by(Incident.status)
-        )
-    ).all()
+    """Return counts by severity, status, service, failure_pattern."""
+    sev = (await db.execute(
+        select(Incident.severity, func.count(Incident.id).label("cnt"))
+        .group_by(Incident.severity)
+    )).all()
+    status = (await db.execute(
+        select(Incident.status, func.count(Incident.id).label("cnt"))
+        .group_by(Incident.status)
+    )).all()
+    svc = (await db.execute(
+        select(Incident.service, func.count(Incident.id).label("cnt"))
+        .where(Incident.service.isnot(None))
+        .group_by(Incident.service)
+    )).all()
+    pattern = (await db.execute(
+        select(Incident.failure_pattern, func.count(Incident.id).label("cnt"))
+        .where(Incident.failure_pattern.isnot(None))
+        .group_by(Incident.failure_pattern)
+    )).all()
     return {
-        "by_severity": {r.severity: r.count for r in severity_counts},
-        "by_status": {r.status: r.count for r in status_counts},
+        "by_severity": {r.severity: r.cnt for r in sev},
+        "by_status": {r.status: r.cnt for r in status},
+        "by_service": {r.service: r.cnt for r in svc},
+        "by_failure_pattern": {r.failure_pattern: r.cnt for r in pattern},
     }
 
 
@@ -86,6 +97,8 @@ async def create_incident(
         status=data.status,
         severity=data.severity,
         service=data.service,
+        failure_pattern=data.failure_pattern,
+        tags=data.tags or [],
         dd_event_id=data.dd_event_id,
         dd_monitor_id=data.dd_monitor_id,
     )
@@ -157,8 +170,8 @@ async def create_timeline_event(
     event = IncidentTimeline(
         incident_id=incident_id,
         event_type=data.event_type,
-        content=data.description,
-        author=data.source,
+        content=data.content,
+        author=data.author,
     )
     db.add(event)
     await db.flush()

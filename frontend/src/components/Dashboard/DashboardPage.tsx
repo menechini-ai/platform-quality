@@ -118,7 +118,7 @@ export function DashboardPage() {
             <div className="space-y-3">
               {slos.slice(0, 6).map((slo) => {
                 const target = slo.thresholds?.[0]?.target ?? slo.target;
-                const pct = (target * 100).toFixed(1);
+                const pct = (Number(target) || 0).toFixed(1);
                 const breached = slo.overall_status === "breached";
                 return (
                   <div key={slo.id}>
