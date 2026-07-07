@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
@@ -96,7 +96,7 @@ async def approve_action(action_id: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=400, detail=f"Action is not pending (status: {action.status})")
 
     action.status = "approved"
-    action.executed_at = datetime.now(timezone.utc)
+    action.executed_at = datetime.now(UTC)
     await db.flush()
     await db.refresh(action)
     return action
@@ -120,7 +120,7 @@ async def reject_action(action_id: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=400, detail=f"Action is not pending (status: {action.status})")
 
     action.status = "rejected"
-    action.executed_at = datetime.now(timezone.utc)
+    action.executed_at = datetime.now(UTC)
     await db.flush()
     await db.refresh(action)
     return action

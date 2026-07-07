@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -18,8 +19,8 @@ async def list_services(env: str = "prod"):
     This wraps span aggregation by service for recent data.
     """
     client = DatadogClient()
-    from datetime import datetime, timezone
-    now = int(datetime.now(timezone.utc).timestamp())
+    from datetime import datetime
+    now = int(datetime.now(UTC).timestamp())
 
     try:
         r = client.aggregate_spans(
@@ -76,8 +77,8 @@ async def list_resources(
     Returns top resources by span count for each service.
     """
     client = DatadogClient()
-    from datetime import datetime, timezone
-    now = int(datetime.now(timezone.utc).timestamp())
+    from datetime import datetime
+    now = int(datetime.now(UTC).timestamp())
 
     service_filter = f"service:{service}" if service else "*"
     try:

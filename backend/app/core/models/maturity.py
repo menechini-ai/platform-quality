@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy import Column, DateTime, Float, Integer, JSON, Text
+from sqlalchemy import JSON, Column, DateTime, Float, Integer, Text
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.core.db import Base
@@ -34,7 +34,7 @@ class MaturityAssessment(Base):
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
     )
 
     def to_dict(self) -> dict:

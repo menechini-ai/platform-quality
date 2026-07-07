@@ -105,7 +105,7 @@ def _generate_summary(
     bottom = sorted(scores.items(), key=lambda x: x[1])
 
     lines = [
-        f"## Maturity Assessment Summary\n",
+        "## Maturity Assessment Summary\n",
         f"**Overall Level:** {level} — {level_name}",
         f"**Overall Score:** {score}/100\n",
         "### Strongest Areas",

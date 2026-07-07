@@ -131,7 +131,9 @@ class DatadogClient:
         if body_filter["query"]:
             body["filter"] = body_filter
         if compute:
-            from datadog_api_client.v2.model.spans_aggregate_request_compute import SpansAggregateRequestCompute
+            from datadog_api_client.v2.model.spans_aggregate_request_compute import (
+                SpansAggregateRequestCompute,
+            )
 
             body["compute"] = [SpansAggregateRequestCompute(**compute)]
         if group_by:
@@ -158,7 +160,9 @@ class DatadogClient:
         if body_filter["query"]:
             body["filter"] = body_filter
         if compute:
-            from datadog_api_client.v2.model.logs_aggregate_request_compute import LogsAggregateRequestCompute
+            from datadog_api_client.v2.model.logs_aggregate_request_compute import (
+                LogsAggregateRequestCompute,
+            )
 
             body["compute"] = [LogsAggregateRequestCompute(**compute)]
         if group_by:

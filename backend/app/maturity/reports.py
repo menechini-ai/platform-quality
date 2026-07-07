@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from string import Formatter
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.models.incident import Incident
-from app.core.models.report import Report
 from app.core.models.rca import RcaReport
+from app.core.models.report import Report
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +114,7 @@ async def generate_report(
     if not template:
         raise ValueError(f"Unknown report type: {report_type}")
 
-    context.setdefault("date", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"))
+    context.setdefault("date", datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"))
     # Fill missing template placeholders with "N/A"
     placeholders = [key for _, key, _, _ in Formatter().parse(template) if key]
     for placeholder in placeholders:

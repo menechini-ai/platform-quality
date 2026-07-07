@@ -64,6 +64,6 @@ async def get_gap_analysis(
 @router.get("/maturity/levels")
 async def list_levels():
     """List all maturity level definitions."""
-    from app.maturity.service import LEVELS, DIMENSIONS
+    from app.maturity.service import DIMENSIONS, LEVELS
 
     return {"levels": LEVELS, "dimensions": DIMENSIONS}

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -12,7 +11,7 @@ from pydantic import BaseModel, Field
 class ReportCreate(BaseModel):
     report_type: str = Field(..., pattern=r"^(executive|monthly|team_health|postmortem|investigation)$")
     title: str = Field(..., max_length=500)
-    incident_id: Optional[str] = None
+    incident_id: str | None = None
     tags: list[str] = []
 
 
@@ -21,8 +20,8 @@ class ReportRead(BaseModel):
     report_type: str
     title: str
     content: str
-    tags: Optional[list] = None
-    metadata_: Optional[dict] = None
+    tags: list | None = None
+    metadata_: dict | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
