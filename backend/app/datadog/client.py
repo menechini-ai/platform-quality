@@ -88,6 +88,11 @@ class DatadogClient:
         response = self.incidents.get_incident(incident_id=incident_id)
         return response.to_dict()
 
+    def search_incidents(self, query: str) -> list[dict[str, Any]]:
+        """Search incidents by query string."""
+        response = self.incidents.search_incidents(body={"filter": {"query": query}})
+        return [i.to_dict() for i in (response.data or [])]
+
     def search_logs(self, query: str, **kwargs: Any) -> dict[str, Any]:
         """Search logs via Datadog Logs API (V2)."""
         from datadog_api_client.v2.model.logs_list_request import LogsListRequest

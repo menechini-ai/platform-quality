@@ -43,11 +43,13 @@ def create_app() -> FastAPI:
     from app.datadog_routes.apm import router as apm_router
     from app.datadog_routes.error_tracking import router as error_tracking_router
     from app.datadog_routes.events import router as events_router
+    from app.datadog_routes.fleet import router as fleet_router
     from app.datadog_routes.incidents import router as dd_incidents_router
     from app.datadog_routes.logs import router as logs_router
     from app.datadog_routes.metrics import router as metrics_router
     from app.datadog_routes.metrics_explore import router as metrics_explore_router
     from app.datadog_routes.monitors import router as monitors_router
+    from app.datadog_routes.rum import router as rum_router
     from app.health.router import router as health_router
     from app.incidents.router import router as incidents_router
     from app.knowledge_base.router import router as kb_router
@@ -56,6 +58,7 @@ def create_app() -> FastAPI:
     from app.rca.router import router as rca_router
     from app.self_healing.router import router as self_healing_router
     from app.datadog_routes.slos import router as slos_router
+    from app.datadog_routes.synthetics import router as synthetics_router
 
     prefix = settings.API_V1_PREFIX
     app.include_router(incidents_router, prefix=prefix, tags=["incidents"])
@@ -72,6 +75,9 @@ def create_app() -> FastAPI:
     app.include_router(metrics_explore_router, prefix=prefix, tags=["datadog-metrics"])
     app.include_router(apm_router, prefix=prefix, tags=["datadog-apm"])
     app.include_router(dd_incidents_router, prefix=prefix, tags=["datadog-incidents"])
+    app.include_router(fleet_router, prefix=prefix, tags=["datadog-fleet"])
+    app.include_router(rum_router, prefix=prefix, tags=["datadog-rum"])
+    app.include_router(synthetics_router, prefix=prefix, tags=["datadog-synthetics"])
     app.include_router(slos_router, prefix=prefix, tags=["datadog-slos"])
     app.include_router(kb_router, prefix=prefix, tags=["knowledge-base"])
     app.include_router(analysis_router, prefix=prefix, tags=["analysis"])

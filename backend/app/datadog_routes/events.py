@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 from app.datadog.client import DatadogClient
+from app.datadog.write_guard import assert_write_allowed
 
 router = APIRouter()
 
@@ -55,6 +56,7 @@ async def create_event(
     priority: str = "normal",
 ):
     """Post an event to Datadog."""
+    assert_write_allowed()
     client = DatadogClient()
     r = client.create_event(
         title=title,
@@ -64,3 +66,32 @@ async def create_event(
         priority=priority,
     )
     return r
+
+
+@router.put("/datadog/events/{event_id}")
+async def update_event(event_id: int, title: str | None = None, text: str | None = None):
+    """Update an existing event."""
+    assert_write_allowed()
+    client = DatadogClient()
+    body = {}
+    if title is not None:
+        body["title"] = title
+    if text is not None:
+        body["text"] = text
+    try:
+        r = client.events.update_event(event_id=event_id, body=body)
+        return r.to_dict()
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+@router.delete("/datadog/events/{event_id}")
+async def delete_event(event_id: int):
+    """Delete an event."""
+    assert_write_allowed()
+    client = DatadogClient()
+    try:
+        client.events.delete_event(event_id=event_id)
+        return {"deleted": True}
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
