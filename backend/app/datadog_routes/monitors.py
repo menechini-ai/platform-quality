@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from app.datadog.client import DatadogClient
-from app.datadog.write_guard import assert_write_allowed
+from app.datadog.formatters import fmt_monitors, maybe_human
+from app.datadog.write_guard import assert_write_allowed, sanitize_error_message
 
 router = APIRouter()
 
@@ -20,6 +21,7 @@ async def list_monitors(
     monitor_tags: str | None = None,
     page_size: int = 50,
     page: int = 0,
+    human: bool = Query(False, alias="human"),
 ):
     """List Datadog monitors with optional filters."""
     kwargs: dict[str, Any] = {}
@@ -34,7 +36,8 @@ async def list_monitors(
 
     client = DatadogClient()
     r = client.monitors.list_monitors(**kwargs, page_size=page_size, page=page)
-    return [m.to_dict() for m in r]
+    data = [m.to_dict() for m in r]
+    return maybe_human(data, fmt_monitors, human, meta={"total": len(data)})
 
 
 @router.get("/datadog/monitors/{monitor_id}")
@@ -45,15 +48,16 @@ async def get_monitor(monitor_id: int):
         r = client.monitors.get_monitor(monitor_id=monitor_id)
         return r.to_dict()
     except Exception as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        raise HTTPException(status_code=404, detail=sanitize_error_message(str(e))) from e
 
 
 @router.get("/datadog/monitors/search")
-async def search_monitors(query: str = "*", page: int = 0, per_page: int = 10):
+async def search_monitors(query: str = "*", page: int = 0, per_page: int = 10, human: bool = Query(False, alias="human")):
     """Search monitors by name/tags."""
     client = DatadogClient()
     r = client.monitors.search_monitors(query=query, page=page, per_page=per_page)
-    return r.to_dict()
+    data = r.to_dict()
+    return maybe_human(data, fmt_monitors, human)
 
 
 @router.get("/datadog/monitors/groups/{monitor_id}")
@@ -64,7 +68,7 @@ async def search_monitor_groups(monitor_id: int):
         r = client.monitors.search_monitor_groups(monitor_id=monitor_id)
         return r.to_dict()
     except Exception as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        raise HTTPException(status_code=404, detail=sanitize_error_message(str(e))) from e
 
 
 @router.post("/datadog/monitors", status_code=201)
@@ -86,7 +90,7 @@ async def create_monitor(
         r = client.monitors.create_monitor(body=body)
         return r.to_dict()
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise HTTPException(status_code=400, detail=sanitize_error_message(str(e))) from e
 
 
 @router.put("/datadog/monitors/{monitor_id}")
@@ -108,7 +112,7 @@ async def update_monitor(
         r = client.monitors.update_monitor(monitor_id=monitor_id, body=body)
         return r.to_dict()
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise HTTPException(status_code=400, detail=sanitize_error_message(str(e))) from e
 
 
 @router.delete("/datadog/monitors/{monitor_id}")
@@ -120,4 +124,4 @@ async def delete_monitor(monitor_id: int, force: bool = False):
         client.monitors.delete_monitor(monitor_id=monitor_id, force=force)
         return {"deleted": True}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise HTTPException(status_code=400, detail=sanitize_error_message(str(e))) from e

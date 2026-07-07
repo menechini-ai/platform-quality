@@ -5,6 +5,8 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 
 from app.datadog.client import DatadogClient
+from app.datadog.formatters import fmt_logs, maybe_human
+from app.datadog.write_guard import sanitize_error_message
 
 router = APIRouter()
 
@@ -16,6 +18,7 @@ async def list_logs(
     sort: str = "-timestamp",
     from_ts: int | None = None,
     to_ts: int | None = None,
+    human: bool = Query(False, alias="human"),
 ):
     """Search Datadog logs."""
     client = DatadogClient()
@@ -27,9 +30,9 @@ async def list_logs(
             filter_from=from_ts,
             filter_to=to_ts,
         )
-        return r
+        return maybe_human(r, fmt_logs, human, meta={"query": query})
     except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
 
 
 @router.post("/datadog/logs")
@@ -57,7 +60,7 @@ async def submit_log(
         r = client.logs.submit_log(body=body)
         return {"status": "ok", "response": r.to_dict()}
     except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
 
 
 @router.post("/datadog/logs/aggregate")
@@ -66,6 +69,7 @@ async def aggregate_logs(
     group_by_facets: list[str] = Query(default=["service"]),
     from_ts: int | None = None,
     to_ts: int | None = None,
+    human: bool = Query(False, alias="human"),
 ):
     """Aggregate logs count by facets."""
     client = DatadogClient()
@@ -77,6 +81,6 @@ async def aggregate_logs(
             filter_from=from_ts,
             filter_to=to_ts,
         )
-        return r
+        return maybe_human(r, fmt_logs, human, meta={"query": query})
     except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e

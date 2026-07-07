@@ -18,6 +18,194 @@ export async function api<T = unknown>(url: string, options?: RequestInit): Prom
   });
 }
 
+// ─── Monitors ────────────────────────────────────────────
+
+export interface DdMonitor {
+  id: number;
+  name: string;
+  status: string;
+  type: string;
+  query: string;
+  message: string;
+  tags: string[];
+  overall_state: string;
+  created: string;
+  updated: string;
+}
+
+export function useDdMonitors(filters?: { name?: string; tags?: string; page?: number }) {
+  const params = new URLSearchParams();
+  if (filters?.name) params.set("name", filters.name);
+  if (filters?.tags) params.set("tags", filters.tags);
+  if (filters?.page) params.set("page", String(filters.page));
+  params.set("page_size", "50");
+
+  return useQuery<DdMonitor[]>({
+    queryKey: ["dd-monitors", filters],
+    queryFn: () => fetchJSON(`/datadog/monitors?${params}`),
+    refetchInterval: 30_000,
+  });
+}
+
+// ─── Logs ────────────────────────────────────────────────
+
+export interface DdLog {
+  id: string;
+  content: string;
+  service?: string;
+  host?: string;
+  tags?: string[];
+  timestamp: string;
+  status?: string;
+}
+
+export function useDdLogs(filters?: { query?: string; limit?: number }) {
+  const params = new URLSearchParams();
+  params.set("query", filters?.query ?? "*");
+  params.set("limit", String(filters?.limit ?? 50));
+  params.set("sort", "-timestamp");
+
+  return useQuery<DdLog[]>({
+    queryKey: ["dd-logs", filters],
+    queryFn: () => fetchJSON(`/datadog/logs?${params}`),
+    refetchInterval: 30_000,
+  });
+}
+
+// ─── Metrics ─────────────────────────────────────────────
+
+export interface DdMetricPoint {
+  timestamp: number;
+  value: number;
+}
+
+export interface DdMetricQuery {
+  metric: string;
+  agg: string;
+  tags: string;
+  scope?: string;
+  days: number;
+}
+
+export interface DdMetricResult {
+  status: string;
+  resp: {
+    series?: { metric: string; points: DdMetricPoint[]; tag_set?: string[] }[];
+    from_date?: string;
+    to_date?: string;
+  };
+}
+
+export function useDdMetrics(filters: DdMetricQuery | null) {
+  const params = new URLSearchParams();
+  if (!filters) return useQuery({ queryKey: ["dd-metrics", null], enabled: false });
+
+  params.set("metric", filters.metric);
+  params.set("agg", filters.agg);
+  params.set("tags", filters.tags);
+  if (filters.scope) params.set("scope", filters.scope);
+  params.set("days", String(filters.days));
+
+  return useQuery<DdMetricResult>({
+    queryKey: ["dd-metrics", filters],
+    queryFn: () => fetchJSON(`/datadog/metrics?${params}`),
+    enabled: !!filters.metric,
+  });
+}
+
+// ─── SLOs ────────────────────────────────────────────────
+
+export interface DdSlo {
+  id: string;
+  name: string;
+  description?: string;
+  target: number;
+  tags?: string[];
+  type?: string;
+  time_window?: string;
+  thresholds?: { target: number; timeframe: string }[];
+  overall_status?: string;
+}
+
+export function useDdSlos(filters?: { query?: string; tags?: string }) {
+  const params = new URLSearchParams();
+  if (filters?.query) params.set("query", filters.query);
+  if (filters?.tags) params.set("tags", filters.tags);
+  params.set("limit", "50");
+
+  return useQuery<DdSlo[]>({
+    queryKey: ["dd-slos", filters],
+    queryFn: () => fetchJSON(`/datadog/slos?${params}`),
+    refetchInterval: 60_000,
+  });
+}
+
+// ─── Error Tracking ─────────────────────────────────────
+
+export interface ErrorTracker {
+  id: string;
+  attributes?: {
+    name?: string;
+    status?: string;
+    category?: string;
+    count?: number;
+    last_error?: string;
+    first_seen?: string;
+    last_seen?: string;
+    service?: string;
+    env?: string;
+  };
+}
+
+export function useErrorTrackers(filters?: { limit?: number }) {
+  const params = new URLSearchParams();
+  params.set("limit", String(filters?.limit ?? 50));
+
+  return useQuery<ErrorTracker[]>({
+    queryKey: ["error-trackers", filters],
+    queryFn: () => fetchJSON(`/datadog/error-tracking/trackers?${params}`),
+    refetchInterval: 60_000,
+  });
+}
+
+export function useErrorEvents(query: string) {
+  return useQuery({
+    queryKey: ["error-events", query],
+    queryFn: () =>
+      fetchJSON("/datadog/error-tracking/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, limit: 50, time_range: "1h" }),
+      }),
+    enabled: !!query,
+  });
+}
+
+// ─── Synthetics ──────────────────────────────────────────
+
+export interface SyntheticTest {
+  public_id: string;
+  name: string;
+  type: string;
+  subtype?: string;
+  status: string;
+  tags?: string[];
+  created_at?: string;
+  modified_at?: string;
+  locations?: string[];
+}
+
+export function useSynthetics(filters?: { limit?: number }) {
+  const params = new URLSearchParams();
+  params.set("limit", String(filters?.limit ?? 50));
+
+  return useQuery<SyntheticTest[]>({
+    queryKey: ["synthetics", filters],
+    queryFn: () => fetchJSON(`/datadog/synthetics?${params}`),
+    refetchInterval: 60_000,
+  });
+}
+
 // ─── Incidents ─────────────────────────────────────────
 
 export interface Incident {
@@ -57,6 +245,7 @@ export function useIncidents(filters?: {
   return useQuery<Incident[]>({
     queryKey: ["incidents", filters],
     queryFn: () => fetchJSON(`/incidents?${params}`),
+    refetchInterval: 15_000,
   });
 }
 
@@ -109,6 +298,7 @@ export function useHealthSummary() {
   return useQuery<HealthSummary[]>({
     queryKey: ["health"],
     queryFn: () => fetchJSON("/health/summary"),
+    refetchInterval: 30_000,
   });
 }
 
@@ -129,7 +319,7 @@ export function useSlos(service?: string) {
   });
 }
 
-// ─── Self-Healing ──────────────────────────────────────
+// ─── Self-Healing ─────────────────────────────────────
 
 export interface Runbook {
   id: string;

@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 
 from app.datadog.client import DatadogClient
+from app.datadog.write_guard import sanitize_error_message
 
 router = APIRouter()
 
@@ -33,4 +34,4 @@ async def search_rum_events(
         r = api.search_rum_events(body=body)
         return r.to_dict()
     except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e

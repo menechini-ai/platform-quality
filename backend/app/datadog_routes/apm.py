@@ -7,14 +7,19 @@ from datetime import UTC
 from fastapi import APIRouter, HTTPException, Query
 
 from app.datadog.client import DatadogClient
+from app.datadog.formatters import fmt_spans, maybe_human
+from app.datadog.write_guard import sanitize_error_message
 
 router = APIRouter()
 
 
 @router.get("/datadog/apm/services")
-async def list_services(env: str = "prod"):
+async def list_services(
+    env: str = "prod",
+    human: bool = Query(False, alias="human"),
+):
     """List APM services.
-    
+
     Note: Datadog's Spans API doesn't have a direct 'list services' endpoint.
     This wraps span aggregation by service for recent data.
     """
@@ -30,9 +35,9 @@ async def list_services(env: str = "prod"):
             filter_from=now - 3600 * 24 * 7,  # 7 days
             filter_to=now,
         )
-        return r
+        return maybe_human(r, fmt_spans, human, meta={"query": f"env:{env}"})
     except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
 
 
 @router.get("/datadog/apm/spans")
@@ -43,6 +48,7 @@ async def list_spans(
     limit: int = Query(default=50, le=200),
     from_ts: int | None = None,
     to_ts: int | None = None,
+    human: bool = Query(False, alias="human"),
 ):
     """Search APM traces/spans."""
     client = DatadogClient()
@@ -61,9 +67,9 @@ async def list_spans(
             filter_from=from_ts,
             filter_to=to_ts,
         )
-        return r
+        return maybe_human(r, fmt_spans, human, meta={"query": combined})
     except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
 
 
 @router.get("/datadog/apm/resources")
@@ -71,9 +77,10 @@ async def list_resources(
     service: str | None = None,
     env: str = "prod",
     limit: int = Query(default=50, le=200),
+    human: bool = Query(False, alias="human"),
 ):
     """List APM resources grouped by service.
-    
+
     Returns top resources by span count for each service.
     """
     client = DatadogClient()
@@ -89,16 +96,17 @@ async def list_resources(
             filter_from=now - 3600 * 24 * 7,
             filter_to=now,
         )
-        return r
+        return maybe_human(r, fmt_spans, human, meta={"query": f"env:{env} {service_filter}"})
     except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
 
 
 @router.get("/datadog/apm/services/{service_name}/definition")
 async def get_service_definition(service_name: str):
     """Get service definition (schema, team, contacts)."""
     import httpx
-    from app.datadog.write_guard import get_headers, get_datadog_url
+
+    from app.datadog.write_guard import get_datadog_url, get_headers
 
     try:
         async with httpx.AsyncClient() as hc:
@@ -107,15 +115,17 @@ async def get_service_definition(service_name: str):
             resp.raise_for_status()
             return resp.json()
     except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
 
 
 @router.get("/datadog/apm/services/{service_name}/dependencies")
 async def get_service_dependencies(service_name: str, days: int = Query(7, ge=1, le=30)):
     """Get upstream/downstream dependencies for a service."""
-    import httpx
-    from app.datadog.write_guard import get_headers, get_datadog_url
     from datetime import UTC, datetime
+
+    import httpx
+
+    from app.datadog.write_guard import get_datadog_url, get_headers
 
     now = int(datetime.now(UTC).timestamp())
     from_ts = now - 3600 * 24 * days
@@ -126,15 +136,17 @@ async def get_service_dependencies(service_name: str, days: int = Query(7, ge=1,
             resp.raise_for_status()
             return resp.json()
     except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
 
 
 @router.get("/datadog/apm/dependencies")
 async def list_all_dependencies(days: int = Query(7, ge=1, le=30)):
     """Get all service dependencies map."""
-    import httpx
-    from app.datadog.write_guard import get_headers, get_datadog_url
     from datetime import UTC, datetime
+
+    import httpx
+
+    from app.datadog.write_guard import get_datadog_url, get_headers
 
     now = int(datetime.now(UTC).timestamp())
     from_ts = now - 3600 * 24 * days
@@ -145,4 +157,4 @@ async def list_all_dependencies(days: int = Query(7, ge=1, le=30)):
             resp.raise_for_status()
             return resp.json()
     except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e

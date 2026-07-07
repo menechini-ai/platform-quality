@@ -95,9 +95,18 @@ class DatadogClient:
 
     def search_logs(self, query: str, **kwargs: Any) -> dict[str, Any]:
         """Search logs via Datadog Logs API (V2)."""
+        from datetime import datetime
+
         from datadog_api_client.v2.model.logs_list_request import LogsListRequest
 
-        body = {"filter": {"query": query}, **kwargs}
+        filt: dict[str, Any] = {"query": query}
+        if "filter_from" in kwargs:
+            val = kwargs.pop("filter_from")
+            filt["from"] = val.isoformat() if isinstance(val, datetime) else val
+        if "filter_to" in kwargs:
+            val = kwargs.pop("filter_to")
+            filt["to"] = val.isoformat() if isinstance(val, datetime) else val
+        body = {"filter": filt, **kwargs}
         request = LogsListRequest(**body)
         response = self.logs.list_logs(body=request)
         return response.to_dict()
@@ -117,9 +126,18 @@ class DatadogClient:
 
     def list_spans(self, query: str, **kwargs: Any) -> dict[str, Any]:
         """Search APM spans (V2 SpansApi)."""
+        from datetime import datetime
+
         from datadog_api_client.v2.model.spans_list_request import SpansListRequest
 
-        body = {"filter": {"query": query}, **kwargs}
+        filt: dict[str, Any] = {"query": query}
+        if "filter_from" in kwargs:
+            val = kwargs.pop("filter_from")
+            filt["from"] = val.isoformat() if isinstance(val, datetime) else val
+        if "filter_to" in kwargs:
+            val = kwargs.pop("filter_to")
+            filt["to"] = val.isoformat() if isinstance(val, datetime) else val
+        body = {"filter": filt, **kwargs}
         request = SpansListRequest(**body)
         response = self.spans.list_spans(body=request)
         return response.to_dict()

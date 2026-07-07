@@ -9,6 +9,7 @@
 body {
   margin: 0;
   min-height: 100vh;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
 }
 
 /* Custom scrollbar */
@@ -31,7 +32,7 @@ body {
 
 /* Glassmorphism utility */
 .glass {
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(13, 17, 23, 0.6);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(148, 163, 184, 0.1);
 }

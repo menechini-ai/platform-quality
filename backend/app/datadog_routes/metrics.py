@@ -5,6 +5,8 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 
 from app.datadog.client import DatadogClient
+from app.datadog.formatters import fmt_metrics, maybe_human
+from app.datadog.write_guard import sanitize_error_message
 
 router = APIRouter()
 
@@ -18,6 +20,7 @@ async def query_metrics(
     from_ts: int | None = None,
     to_ts: int | None = None,
     days: int = Query(1, ge=1, le=30),
+    human: bool = Query(False, alias="human"),
 ):
     """Query Datadog metrics timeseries with tag filtering.
 
@@ -49,17 +52,9 @@ async def query_metrics(
     client = DatadogClient()
     try:
         r = client.query_metrics(query=dd_query, from_ts=from_val, to_ts=to_val)
-        return {
-            "query": dd_query,
-            "from_ts": from_val,
-            "to_ts": to_val,
-            "metric": metric,
-            "aggregation": agg,
-            "tags": tags,
-            "data": r,
-        }
+        return maybe_human(r, fmt_metrics, human, meta={"query": dd_query})
     except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
 
 
 @router.get("/datadog/metrics/metadata")
@@ -72,4 +67,4 @@ async def get_metric_metadata(
         r = client.metrics.get_metric_metadata(metric_name=metric_name)
         return r.to_dict()
     except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e

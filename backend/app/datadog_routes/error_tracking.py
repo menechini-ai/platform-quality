@@ -1,110 +1,79 @@
-"""Error Tracking router — queries Datadog logs + spans for error events."""
+"""Error Tracking router — direct Datadog Error Tracking API (v2)."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 
-from app.datadog.client import DatadogClient
+from app.datadog.write_guard import get_datadog_url, get_headers, sanitize_error_message
 
 router = APIRouter()
 
 
-@router.get("/datadog/errors")
-async def list_errors(
-    query: str = "status:error OR status:critical",
-    service: str | None = None,
-    env: str | None = None,
-    limit: int = Query(default=50, le=200),
+@router.get("/datadog/error-tracking/trackers")
+async def list_error_trackers(
+    limit: int = Query(50, le=200),
+    offset: int = Query(0, ge=0),
+):
+    """List error trackers from Datadog Error Tracking API."""
+    import httpx
+
+    try:
+        async with httpx.AsyncClient() as hc:
+            url = f"{get_datadog_url()}/api/v2/error_trackers"
+            resp = await hc.get(
+                url, headers=get_headers(), params={"limit": limit, "offset": offset}
+            )
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
+
+
+@router.get("/datadog/error-tracking/trackers/{tracker_id}")
+async def get_error_tracker(tracker_id: str):
+    """Get a single error tracker by ID."""
+    import httpx
+
+    try:
+        async with httpx.AsyncClient() as hc:
+            url = f"{get_datadog_url()}/api/v2/error_trackers/{tracker_id}"
+            resp = await hc.get(url, headers=get_headers())
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
+
+
+@router.post("/datadog/error-tracking/events")
+async def search_error_events(
+    query: str = Query("*", description="Error event query (e.g. service:api)"),
+    limit: int = Query(50, le=200),
     from_ts: int | None = None,
     to_ts: int | None = None,
+    time_range: str = "1h",
 ):
-    """Search error events across logs + APM.
+    """Search error events from Datadog Error Tracking API."""
+    from datetime import UTC, datetime
 
-    Combines log errors and APM error spans in a single view.
-    Uses `@error.*` facets for structured error data.
-    """
-    client = DatadogClient()
+    import httpx
 
-    filters = [query]
-    if service:
-        filters.append(f"service:{service}")
-    if env:
-        filters.append(f"env:{env}")
+    from app.datadog.utils import parse_time
 
-    combined_query = " ".join(filters)
+    now = int(datetime.now(UTC).timestamp())
+    from_val = from_ts or parse_time(time_range)
+    to_val = to_ts or now
 
-    logs_result = {}
-    spans_result = {}
-
-    # Query logs for errors
-    try:
-        logs_result = client.search_logs(
-            combined_query,
-            limit=limit,
-            sort="-timestamp",
-            filter_from=from_ts,
-            filter_to=to_ts,
-        )
-    except Exception as e:
-        logs_result = {"error": str(e), "data": []}
-
-    # Query APM error spans
-    try:
-        spans_result = client.list_spans(
-            combined_query,
-            limit=limit,
-            sort="-timestamp",
-            filter_from=from_ts,
-            filter_to=to_ts,
-        )
-    except Exception as e:
-        spans_result = {"error": str(e), "data": []}
-
-    return {
-        "query": combined_query,
-        "logs": logs_result.get("data", []),
-        "spans": spans_result.get("data", []),
-        "total_logs": len(logs_result.get("data", [])),
-        "total_spans": len(spans_result.get("data", [])),
+    body = {
+        "filter": {"query": query, "from": from_val, "to": to_val},
+        "page": {"limit": limit},
+        "sort": "-@timestamp",
     }
 
-
-@router.get("/datadog/errors/summary")
-async def error_summary(
-    query: str = "status:error",
-    from_ts: int | None = None,
-    to_ts: int | None = None,
-):
-    """Aggregated error summary by service and type."""
-    client = DatadogClient()
-
-    # Aggregate logs
-    log_aggregation = {}
     try:
-        log_aggregation = client.aggregate_logs(
-            filter_query=query,
-            compute={"aggregation": "count"},
-            group_by=[{"facet": "service"}, {"facet": "@error.kind"}],
-            filter_from=from_ts,
-            filter_to=to_ts,
-        )
+        async with httpx.AsyncClient() as hc:
+            url = f"{get_datadog_url()}/api/v2/error_events"
+            resp = await hc.post(url, headers=get_headers(), json=body)
+            resp.raise_for_status()
+            return resp.json()
     except Exception as e:
-        log_aggregation = {"error": str(e)}
-
-    # Aggregate APM error spans
-    span_aggregation = {}
-    try:
-        span_aggregation = client.aggregate_spans(
-            filter_query=query,
-            compute={"aggregation": "count"},
-            group_by=[{"facet": "service"}, {"facet": "resource"}],
-            filter_from=from_ts,
-            filter_to=to_ts,
-        )
-    except Exception as e:
-        span_aggregation = {"error": str(e)}
-
-    return {
-        "logs": log_aggregation,
-        "spans": span_aggregation,
-    }
+        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e

@@ -5,25 +5,21 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 
 from app.datadog.client import DatadogClient
+from app.datadog.formatters import fmt_slos, maybe_human
+from app.datadog.write_guard import sanitize_error_message
 
 router = APIRouter()
 
 
 @router.get("/datadog/slos")
 async def list_datadog_slos(
-    tags: str | None = Query(None, description="Tag filter, e.g. 'env:prod,service:api'"),
+    tags: str | None = Query(None, description="Tag filter"),
     query: str | None = Query(None, description="Substring match on SLO name/description"),
     limit: int = Query(50, le=200),
     offset: int = Query(0, ge=0),
+    human: bool = Query(False, alias="human"),
 ):
-    """List Datadog SLOs with optional tag filtering.
-
-    Tags follow Unified Service Tagging (UST):
-      env:prod/staging/dev, service:<name>, team:<team>
-
-    Example:
-      /api/v1/datadog/slos?tags=env:prod,service:api&limit=25
-    """
+    """List Datadog SLOs with optional tag filtering."""
     client = DatadogClient()
     kwargs: dict = {"limit": limit, "offset": offset}
     if tags:
@@ -31,9 +27,10 @@ async def list_datadog_slos(
     if query:
         kwargs["query"] = query
     try:
-        return client.list_slos(**kwargs)
+        data = client.list_slos(**kwargs)
+        return maybe_human(data, fmt_slos, human, meta={"total": len(data)})
     except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
 
 
 # Static paths BEFORE param paths
@@ -52,7 +49,7 @@ async def list_slo_corrections(
         r = client.slos.list_slo_corrections(**kwargs)
         return r.to_dict()
     except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
 
 
 @router.get("/datadog/slos/{slo_id}")
@@ -63,7 +60,7 @@ async def get_datadog_slo(slo_id: str):
         r = client.slos.get_slo(slo_id=slo_id)
         return r.to_dict()
     except Exception as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        raise HTTPException(status_code=404, detail=sanitize_error_message(str(e))) from e
 
 
 @router.get("/datadog/slos/{slo_id}/history")
@@ -81,4 +78,4 @@ async def get_slo_history(
         r = client.slos.get_slo_history(slo_id=slo_id, from_ts=from_ts, to_ts=now)
         return r.to_dict()
     except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e

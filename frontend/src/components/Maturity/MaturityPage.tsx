@@ -81,9 +81,8 @@ function useLevels() {
 }
 
 export function MaturityPage() {
-  const { data: latest, isLoading: loadingLatest } = useLatestAssessment();
+  const { data: latest } = useLatestAssessment();
   const { data: levelsData } = useLevels();
-  const { data: gaps } = useGapAnalysis(latest?.overall_level ?? 0, 3);
   const [targetLevel, setTargetLevel] = useState(3);
   const { data: customGaps } = useGapAnalysis(latest?.overall_level ?? 0, targetLevel);
 

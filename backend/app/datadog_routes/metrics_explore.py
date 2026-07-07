@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 
 from app.datadog.client import DatadogClient
+from app.datadog.write_guard import sanitize_error_message
 
 router = APIRouter()
 
@@ -29,7 +30,7 @@ async def list_available_metrics(
         )
         return r.to_dict()
     except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
 
 
 @router.get("/datadog/metrics/{metric_name}/fields")
@@ -48,7 +49,7 @@ async def get_metric_tag_fields(metric_name: str):
         fields = sorted(set(t.split(":", 1)[0] for t in tags if ":" in t))
         return {"metric": metric_name, "fields": fields, "tag_count": len(tags)}
     except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
 
 
 @router.get("/datadog/metrics/{metric_name}/values")
@@ -70,4 +71,4 @@ async def get_metric_tag_values(
         values = sorted(set(t[len(prefix):] for t in tags if t.startswith(prefix)))
         return {"metric": metric_name, "field": field_name, "values": values}
     except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e

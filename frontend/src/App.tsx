@@ -8,6 +8,12 @@ import { HealthPage } from "@/components/Health/HealthPage";
 import { SelfHealingPage } from "@/components/SelfHealing/SelfHealingPage";
 import { MaturityPage } from "@/components/Maturity/MaturityPage";
 import { ReportsPage } from "@/components/Reports/ReportsPage";
+import { MonitorsPage } from "@/components/Monitors/MonitorsPage";
+import { LogsPage } from "@/components/Logs/LogsPage";
+import { MetricsPage } from "@/components/Metrics/MetricsPage";
+import { SlosPage } from "@/components/Slos/SlosPage";
+import { ErrorTrackingPage } from "@/components/ErrorTracking/ErrorTrackingPage";
+import { SyntheticsPage } from "@/components/Synthetics/SyntheticsPage";
 
 export default function App() {
   return (
@@ -17,6 +23,12 @@ export default function App() {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/incidents" element={<IncidentsPage />} />
           <Route path="/incidents/:id" element={<IncidentDetailPage />} />
+          <Route path="/monitors" element={<MonitorsPage />} />
+          <Route path="/logs" element={<LogsPage />} />
+          <Route path="/metrics" element={<MetricsPage />} />
+          <Route path="/slos" element={<SlosPage />} />
+          <Route path="/error-tracking" element={<ErrorTrackingPage />} />
+          <Route path="/synthetics" element={<SyntheticsPage />} />
           <Route path="/rca" element={<RCAPage />} />
           <Route path="/health" element={<HealthPage />} />
           <Route path="/self-healing" element={<SelfHealingPage />} />

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.datadog.write_guard import get_headers, get_datadog_url
+from app.datadog.formatters import fmt_fleet, maybe_human
+from app.datadog.write_guard import get_datadog_url, get_headers, sanitize_error_message
 
 router = APIRouter()
 
@@ -13,6 +14,7 @@ router = APIRouter()
 async def list_fleet_agents(
     filter: str | None = None,
     page_size: int = Query(50, le=200),
+    human: bool = Query(False, alias="human"),
 ):
     """List fleet agents managed by Datadog Fleet Automation."""
     import httpx
@@ -25,9 +27,10 @@ async def list_fleet_agents(
                 params["filter"] = filter
             resp = await hc.get(url, headers=get_headers(), params=params)
             resp.raise_for_status()
-            return resp.json()
+            data = resp.json()
+            return maybe_human(data, fmt_fleet, human, meta={"total": len(data.get("data", []))})
     except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
 
 
 @router.get("/datadog/fleet/agents/{agent_id}")
@@ -42,4 +45,4 @@ async def get_fleet_agent_info(agent_id: str):
             resp.raise_for_status()
             return resp.json()
     except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e

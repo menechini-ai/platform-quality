@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from app.datadog.client import DatadogClient
-from app.datadog.write_guard import assert_write_allowed
+from app.datadog.formatters import fmt_events, maybe_human
+from app.datadog.write_guard import assert_write_allowed, sanitize_error_message
 
 router = APIRouter()
 
@@ -17,6 +18,7 @@ async def list_events(
     priority: str | None = None,
     sources: str | None = None,
     tags: str | None = None,
+    human: bool = Query(False, alias="human"),
 ):
     """List Datadog events with optional filters."""
     kwargs: dict[str, object] = {}
@@ -33,7 +35,8 @@ async def list_events(
 
     client = DatadogClient()
     r = client.events.list_events(**kwargs)
-    return r.to_dict()
+    data = r.to_dict()
+    return maybe_human(data, fmt_events, human)
 
 
 @router.get("/datadog/events/{event_id}")
@@ -44,7 +47,7 @@ async def get_event(event_id: int):
         r = client.events.get_event(event_id=event_id)
         return r.to_dict()
     except Exception as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        raise HTTPException(status_code=404, detail=sanitize_error_message(str(e))) from e
 
 
 @router.post("/datadog/events")
@@ -82,7 +85,7 @@ async def update_event(event_id: int, title: str | None = None, text: str | None
         r = client.events.update_event(event_id=event_id, body=body)
         return r.to_dict()
     except Exception as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        raise HTTPException(status_code=404, detail=sanitize_error_message(str(e))) from e
 
 
 @router.delete("/datadog/events/{event_id}")
@@ -94,4 +97,4 @@ async def delete_event(event_id: int):
         client.events.delete_event(event_id=event_id)
         return {"deleted": True}
     except Exception as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        raise HTTPException(status_code=404, detail=sanitize_error_message(str(e))) from e
