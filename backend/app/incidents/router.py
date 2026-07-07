@@ -1,0 +1,166 @@
+"""Incidents router."""
+
+from __future__ import annotations
+
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.db import get_db
+from app.core.models.incident import Incident, IncidentTimeline
+from app.core.schemas.incident import (
+    IncidentCreate,
+    IncidentRead,
+    IncidentUpdate,
+    TimelineEventCreate,
+    TimelineEventRead,
+)
+
+router = APIRouter(tags=["incidents"])
+
+
+@router.get("/incidents", response_model=list[IncidentRead])
+async def list_incidents(
+    status: str | None = Query(None, pattern=r"^(active|stable|resolved)$"),
+    severity: str | None = Query(None, pattern=r"^SEV-[1-5]$"),
+    service: str | None = None,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+):
+    """List incidents with optional filters."""
+    stmt = select(Incident).order_by(Incident.created_at.desc())
+    if status:
+        stmt = stmt.where(Incident.status == status)
+    if severity:
+        stmt = stmt.where(Incident.severity == severity)
+    if service:
+        stmt = stmt.where(Incident.service == service)
+    stmt = stmt.offset(offset).limit(limit)
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+
+@router.get("/incidents/summary")
+async def incident_summary(db: AsyncSession = Depends(get_db)):
+    """Return counts by severity and status."""
+    severity_counts = (
+        await db.execute(
+            select(Incident.severity, func.count(Incident.id).label("count"))
+            .group_by(Incident.severity)
+        )
+    ).all()
+    status_counts = (
+        await db.execute(
+            select(Incident.status, func.count(Incident.id).label("count"))
+            .group_by(Incident.status)
+        )
+    ).all()
+    return {
+        "by_severity": {r.severity: r.count for r in severity_counts},
+        "by_status": {r.status: r.count for r in status_counts},
+    }
+
+
+@router.get("/incidents/{incident_id}", response_model=IncidentRead)
+async def get_incident(incident_id: UUID, db: AsyncSession = Depends(get_db)):
+    """Get a specific incident."""
+    result = await db.execute(select(Incident).where(Incident.id == incident_id))
+    incident = result.scalar_one_or_none()
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    return incident
+
+
+@router.post("/incidents", response_model=IncidentRead, status_code=201)
+async def create_incident(
+    data: IncidentCreate,
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a new incident."""
+    incident = Incident(
+        title=data.title,
+        description=data.description,
+        status=data.status,
+        severity=data.severity,
+        service=data.service,
+        dd_event_id=data.dd_event_id,
+        dd_monitor_id=data.dd_monitor_id,
+    )
+    db.add(incident)
+    await db.flush()
+    await db.refresh(incident)
+    return incident
+
+
+@router.patch("/incidents/{incident_id}", response_model=IncidentRead)
+async def update_incident(
+    incident_id: UUID,
+    data: IncidentUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    """Update an incident."""
+    result = await db.execute(select(Incident).where(Incident.id == incident_id))
+    incident = result.scalar_one_or_none()
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    update_data = data.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(incident, field, value)
+    await db.flush()
+    await db.refresh(incident)
+    return incident
+
+
+@router.delete("/incidents/{incident_id}", status_code=204)
+async def delete_incident(incident_id: UUID, db: AsyncSession = Depends(get_db)):
+    """Delete an incident."""
+    result = await db.execute(select(Incident).where(Incident.id == incident_id))
+    incident = result.scalar_one_or_none()
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    await db.delete(incident)
+    await db.flush()
+
+
+# --- Timeline sub-resource ---
+
+
+@router.get(
+    "/incidents/{incident_id}/timeline",
+    response_model=list[TimelineEventRead],
+)
+async def list_timeline(incident_id: UUID, db: AsyncSession = Depends(get_db)):
+    """List timeline events for an incident."""
+    result = await db.execute(
+        select(IncidentTimeline)
+        .where(IncidentTimeline.incident_id == incident_id)
+        .order_by(IncidentTimeline.created_at)
+    )
+    return result.scalars().all()
+
+
+@router.post(
+    "/incidents/{incident_id}/timeline",
+    response_model=TimelineEventRead,
+    status_code=201,
+)
+async def create_timeline_event(
+    incident_id: UUID,
+    data: TimelineEventCreate,
+    db: AsyncSession = Depends(get_db),
+):
+    """Add a timeline event to an incident."""
+    event = IncidentTimeline(
+        incident_id=incident_id,
+        event_type=data.event_type,
+        content=data.description,
+        author=data.source,
+    )
+    db.add(event)
+    await db.flush()
+    await db.refresh(event)
+    return event
