@@ -92,3 +92,57 @@ async def list_resources(
         return r
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
+
+
+@router.get("/datadog/apm/services/{service_name}/definition")
+async def get_service_definition(service_name: str):
+    """Get service definition (schema, team, contacts)."""
+    import httpx
+    from app.datadog.write_guard import get_headers, get_datadog_url
+
+    try:
+        async with httpx.AsyncClient() as hc:
+            url = f"{get_datadog_url()}/api/v2/services/definitions/{service_name}"
+            resp = await hc.get(url, headers=get_headers(), params={"schema_version": "v2.2"})
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+
+@router.get("/datadog/apm/services/{service_name}/dependencies")
+async def get_service_dependencies(service_name: str, days: int = Query(7, ge=1, le=30)):
+    """Get upstream/downstream dependencies for a service."""
+    import httpx
+    from app.datadog.write_guard import get_headers, get_datadog_url
+    from datetime import UTC, datetime
+
+    now = int(datetime.now(UTC).timestamp())
+    from_ts = now - 3600 * 24 * days
+    try:
+        async with httpx.AsyncClient() as hc:
+            url = f"{get_datadog_url()}/api/v2/services/{service_name}/dependencies"
+            resp = await hc.get(url, headers=get_headers(), params={"from": from_ts, "to": now})
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+
+@router.get("/datadog/apm/dependencies")
+async def list_all_dependencies(days: int = Query(7, ge=1, le=30)):
+    """Get all service dependencies map."""
+    import httpx
+    from app.datadog.write_guard import get_headers, get_datadog_url
+    from datetime import UTC, datetime
+
+    now = int(datetime.now(UTC).timestamp())
+    from_ts = now - 3600 * 24 * days
+    try:
+        async with httpx.AsyncClient() as hc:
+            url = f"{get_datadog_url()}/api/v2/services/dependencies"
+            resp = await hc.get(url, headers=get_headers(), params={"from": from_ts, "to": now})
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
