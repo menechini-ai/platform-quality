@@ -10,10 +10,13 @@ Uses the official datadog-api-client Python library with:
 
 from __future__ import annotations
 
+import asyncio
 import logging
+from collections.abc import Callable
 from typing import Any
 
 from datadog_api_client import ApiClient, Configuration
+from datadog_api_client.exceptions import ApiException
 from datadog_api_client.v1.api.events_api import EventsApi
 from datadog_api_client.v1.api.metrics_api import MetricsApi
 from datadog_api_client.v1.api.monitors_api import MonitorsApi
@@ -21,13 +24,13 @@ from datadog_api_client.v1.api.service_level_objectives_api import ServiceLevelO
 from datadog_api_client.v2.api.incidents_api import IncidentsApi
 from datadog_api_client.v2.api.logs_api import LogsApi
 from datadog_api_client.v2.api.spans_api import SpansApi
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import Retrying, retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-RETRYABLE_EXCEPTIONS = (ConnectionError, TimeoutError)
+RETRYABLE_EXCEPTIONS = (ConnectionError, TimeoutError, ApiException)
 
 
 class DatadogClient:
@@ -265,3 +268,41 @@ class DatadogClient:
         if hasattr(self, "_api_client"):
             self._api_client.close()
             DatadogClient._instance = None
+
+    @staticmethod
+    def _is_retryable_api_error(exc: Exception) -> bool:
+        """True if the exception is retryable (rate-limit or server error)."""
+        if not isinstance(exc, ApiException):
+            return False
+        return exc.status in (429,) or (exc.status and 500 <= exc.status < 600)
+
+    async def call(
+        self,
+        func: Callable[..., Any],
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+        """Run a synchronous SDK call in a thread with retry.
+
+        Usage:
+            result = await client.call(client.monitors.list_monitors, ...)
+            result = await client.call(client.incidents.list_incidents, ...)
+        """
+        return await _call_with_retry(func, *args, **kwargs)
+
+
+async def _call_with_retry(func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+    """Thread-offload wrapper with tenacity retry, including ApiException."""
+
+    retryer = Retrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=30),
+        retry=(
+            retry_if_exception_type(RETRYABLE_EXCEPTIONS) | DatadogClient._is_retryable_api_error
+        ),
+    )
+
+    for attempt in retryer:
+        with attempt:
+            return await asyncio.to_thread(func, *args, **kwargs)
+    return None  # unreachable

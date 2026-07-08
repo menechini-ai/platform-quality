@@ -213,6 +213,7 @@ export interface Incident {
   id: string;
   dd_id?: string;
   title: string;
+  tags?: string[];
   description?: string;
   severity: string;
   status: string;
@@ -237,12 +238,16 @@ export function useIncidents(filters?: {
   status?: string;
   severity?: string;
   service?: string;
+  failure_pattern?: string;
+  tags?: string;
 }) {
   const params = new URLSearchParams();
   if (filters?.status) params.set("status", filters.status);
   if (filters?.severity) params.set("severity", filters.severity);
   if (filters?.service) params.set("service", filters.service);
-
+  if (filters?.failure_pattern) params.set("failure_pattern", filters.failure_pattern);
+  if (filters?.tags) params.set("tags", filters.tags);
+  params.set("limit", "200");
   return useQuery<Incident[]>({
     queryKey: ["incidents", filters],
     queryFn: () => fetchJSON(`/incidents?${params}`),

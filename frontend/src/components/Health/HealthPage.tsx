@@ -7,6 +7,7 @@ import {
   useHealthForecast,
   type CatalogItem,
 } from "@/api/client";
+import { TagFilter } from "@/components/TagFilter/TagFilter";
 import {
   HeartPulse,
   AlertTriangle,
@@ -69,16 +70,27 @@ function StatCard({
 export function HealthPage() {
   const navigate = useNavigate();
   const [days, setDays] = useState<number | undefined>(undefined);
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
   const { data: catalog, isLoading: catLoading } = useHealthCatalog(days);
   const { data: stats, isLoading: statsLoading } = useHealthStats(days);
   const { data: kb } = useKnowledgeBase();
   const { data: forecast } = useHealthForecast(30);
 
-  // Build service → failure pattern stats
+  // Filter catalog by tags
+  const filteredCatalog = useMemo(() => {
+    if (!catalog) return [];
+    if (tagFilter.length === 0) return catalog;
+    return catalog.filter((item) => {
+      const itemTags: string[] = item.tags ?? [];
+      return tagFilter.some((t) => itemTags.includes(t));
+    });
+  }, [catalog, tagFilter]);
+
+  // Build service → failure pattern stats (from filteredCatalog)
   const servicePatternCount = useMemo(() => {
-    if (!catalog) return {};
+    if (!filteredCatalog) return {};
     const acc: Record<string, Record<string, number>> = {};
-    for (const item of catalog) {
+    for (const item of filteredCatalog) {
       if (item.type !== "incident") continue;
       const svc = item.service || "unknown";
       const pat = item.failure_pattern || "unknown";
@@ -86,20 +98,20 @@ export function HealthPage() {
       acc[svc][pat] = (acc[svc][pat] || 0) + 1;
     }
     return acc;
-  }, [catalog]);
+  }, [filteredCatalog]);
 
-  // Categorize incidents by failure pattern
+  // Categorize incidents by failure pattern (from filteredCatalog)
   const patternIncidents = useMemo(() => {
-    if (!catalog) return {};
+    if (!filteredCatalog) return {};
     const acc: Record<string, CatalogItem[]> = {};
-    for (const item of catalog) {
+    for (const item of filteredCatalog) {
       if (item.type !== "incident") continue;
       const pat = item.failure_pattern || "uncategorized";
       if (!acc[pat]) acc[pat] = [];
       acc[pat].push(item);
     }
     return acc;
-  }, [catalog]);
+  }, [filteredCatalog]);
 
   const isLoading = catLoading || statsLoading;
 
@@ -140,6 +152,16 @@ export function HealthPage() {
           >
             Clear
           </button>
+        )}
+      </div>
+
+      {/* Tag Filter */}
+      <div className="flex items-center gap-2">
+        <TagFilter tags={tagFilter} onChange={setTagFilter} placeholder="filter catalog by tag..." />
+        {tagFilter.length > 0 && (
+          <span className="text-xs text-slate-500 font-mono">
+            {filteredCatalog.length} / {catalog?.length ?? 0} resources
+          </span>
         )}
       </div>
 

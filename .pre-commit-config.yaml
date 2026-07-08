@@ -60,3 +60,25 @@ repos:
         types: [ts]
         pass_filenames: false
         require_serial: true
+
+  # ─── Backend: pytest ──────────────────────────────────────
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest (backend)
+        entry: bash -c 'cd backend && uv run pytest -q tests/'
+        language: system
+        types: [python]
+        pass_filenames: false
+        require_serial: true
+
+  # ─── Frontend: vitest ─────────────────────────────────────
+  - repo: local
+    hooks:
+      - id: vitest
+        name: vitest (frontend)
+        entry: bash -c 'cd frontend && npx vitest run'
+        language: system
+        files: ^frontend/
+        pass_filenames: false
+        require_serial: true

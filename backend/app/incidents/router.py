@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import String, cast, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
 from app.core.models.incident import Incident, IncidentTimeline
@@ -17,11 +18,6 @@ from app.core.schemas.incident import (
     TimelineEventRead,
 )
 
-if TYPE_CHECKING:
-    from uuid import UUID
-
-    from sqlalchemy.ext.asyncio import AsyncSession
-
 router = APIRouter(tags=["incidents"])
 
 
@@ -32,6 +28,10 @@ async def list_incidents(
     service: str | None = None,
     failure_pattern: str | None = Query(
         None, pattern=r"^(deploy|resource|latency|dependency|data_corruption)$"
+    ),
+    tags: str | None = Query(
+        None,
+        description="Comma-separated tags filter — matches incidents with ANY of these tags (JSON array contains)",
     ),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
@@ -47,6 +47,11 @@ async def list_incidents(
         stmt = stmt.where(Incident.service == service)
     if failure_pattern:
         stmt = stmt.where(Incident.failure_pattern == failure_pattern)
+    if tags:
+        for tag in tags.split(","):
+            tag = tag.strip()
+            if tag:
+                stmt = stmt.where(cast(Incident.tags, String).contains(tag))
     stmt = stmt.offset(offset).limit(limit)
     result = await db.execute(stmt)
     return result.scalars().all()
