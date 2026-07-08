@@ -1,26 +1,22 @@
 """Pydantic schemas for RCA reports."""
 
-from __future__ import annotations
-
-from typing import TYPE_CHECKING, Any
+from datetime import datetime
+from typing import Any
+from uuid import UUID
 
 from pydantic import BaseModel
 
-if TYPE_CHECKING:
-    import uuid
-    from datetime import datetime
-
 
 class RcaReportCreate(BaseModel):
-    incident_id: uuid.UUID
+    incident_id: UUID
     summary: str | None = None
     root_cause: str | None = None
     recommendations: list[str] | None = None
 
 
 class RcaReportRead(BaseModel):
-    id: uuid.UUID
-    incident_id: uuid.UUID
+    id: UUID
+    incident_id: UUID
     summary: str | None = None
     root_cause: str | None = None
     timeline: Any | None = None

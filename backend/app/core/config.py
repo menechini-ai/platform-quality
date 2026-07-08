@@ -1,5 +1,6 @@
 """Global configuration via pydantic-settings."""
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,6 +17,19 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "change-me-in-production"
     API_V1_PREFIX: str = "/api/v1"
     CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+
+    @field_validator("SECRET_KEY")
+    @classmethod
+    def validate_secret_key(cls, v: str) -> str:
+        if not v or v == "change-me-in-production":
+            import os
+
+            if os.environ.get("ENV", "").lower() in ("production", "prod"):
+                raise ValueError(
+                    "SECRET_KEY must be changed from default in production. "
+                    "Set a strong key (≥32 chars) via environment or .env"
+                )
+        return v
 
     # --- PostgreSQL ---
     DATABASE_URL: str = "postgresql+asyncpg://observai:observai@localhost:5432/observai"
