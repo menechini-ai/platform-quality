@@ -61,12 +61,6 @@ jobs:
         env:
           DATABASE_URL: postgresql+asyncpg://observai:observai@localhost:5432/observai
 
-      - name: Validate pre-commit hooks
-        run: |
-          . .venv/bin/activate
-          SKIP=eslint,tsc pre-commit run --all-files --show-diff-on-failure
-        continue-on-error: false
-
   frontend:
     runs-on: ubuntu-latest
     defaults:

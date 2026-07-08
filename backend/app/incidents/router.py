@@ -39,7 +39,7 @@ async def list_incidents(
     ),
     tags: str | None = Query(
         None,
-        description="Comma-separated tags filter — matches incidents with ANY of these tags (JSON array contains)",
+        description="Comma-separated tags — incidents matching ANY tag",
     ),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),

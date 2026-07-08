@@ -42,7 +42,10 @@ async def list_monitors(
 
 @router.get("/datadog/monitors/search")
 async def search_monitors(
-    query: str | None = Query(default=None), page: int = 0, per_page: int = 10, human: bool = Query(False, alias="human")
+    query: str | None = Query(default=None),
+    page: int = 0,
+    per_page: int = 10,
+    human: bool = Query(False, alias="human"),
 ):
     """Search monitors by name/tags."""
     client = DatadogClient()

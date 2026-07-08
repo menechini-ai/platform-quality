@@ -12,8 +12,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 from datadog_api_client import ApiClient, Configuration
 from datadog_api_client.exceptions import ApiException
