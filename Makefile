@@ -92,6 +92,21 @@ clean:
 	find . -type d -name node_modules -exec rm -rf {} + 2>/dev/null || true
 	rm -rf .coverage htmlcov
 
+# ─── API Demo ─────────────────────────────────────────────────────────
+
+api-demo-build:
+	docker compose --profile demo build api-demo
+
+api-demo-help:
+	docker compose --profile demo run --rm api-demo
+
+api-demo-test:
+	docker compose --profile demo run --rm --no-deps api-demo \
+		bash -c "PYTHONPATH=/app/api-demo python -m pytest api-demo/tests/ -v"
+
+api-demo-shell:
+	docker compose --profile demo run --rm --no-deps api-demo bash
+
 # ─── Help ─────────────────────────────────────────────────────────
 
 help:
@@ -117,3 +132,9 @@ help:
 	@echo "Docker:"
 	@echo "make up              - Full stack via Docker Compose"
 	@echo "make down            - Stop Docker Compose"
+	@echo ""
+	@echo "API Demo (docker compose --profile demo):"
+	@echo "make api-demo-build  - Build api-demo image"
+	@echo "make api-demo-help   - Show api-demo run.py --help"
+	@echo "make api-demo-test   - Run api-demo tests (38 tests)"
+	@echo "make api-demo-shell  - Open bash in api-demo container"

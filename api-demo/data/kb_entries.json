@@ -1,0 +1,37 @@
+[
+  {
+    "id": "kb-001",
+    "pattern": "deploy_failure",
+    "title": "Deploy Rollback Procedure",
+    "summary": "When a canary deploy exceeds error budget, auto-rollback via CI pipeline",
+    "tags": ["deploy", "rollback", "canary"]
+  },
+  {
+    "id": "kb-002",
+    "pattern": "resource_exhaustion",
+    "title": "Horizontal Pod Autoscaler Tuning",
+    "summary": "Scale replicas when CPU > 80% for 5min, cooldown 3min between scale-ups",
+    "tags": ["resource", "hpa", "scaling"]
+  },
+  {
+    "id": "kb-003",
+    "pattern": "latency_spike",
+    "title": "Slow Query Detection & Remediation",
+    "summary": "Identify queries with seq_scan or missing index via pg_stat_activity",
+    "tags": ["latency", "database", "query"]
+  },
+  {
+    "id": "kb-004",
+    "pattern": "dependency_failure",
+    "title": "Circuit Breaker Recovery",
+    "summary": "After 3 consecutive timeouts, open circuit; retry after 30s half-open window",
+    "tags": ["dependency", "circuit-breaker", "timeout"]
+  },
+  {
+    "id": "kb-005",
+    "pattern": "data_corruption",
+    "title": "Schema Migration Validation",
+    "summary": "Run data integrity checks after each migration: row count, checksum, FK validation",
+    "tags": ["data", "migration", "integrity"]
+  }
+]

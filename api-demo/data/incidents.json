@@ -1,0 +1,42 @@
+[
+  {
+    "id": "demo-inc-001",
+    "title": "API Gateway — P50 Latency Breach",
+    "severity": "SEV-3",
+    "status": "resolved",
+    "service": "api-gateway",
+    "description": "Latency spiked to 1.2s after code deployment v2.3.1"
+  },
+  {
+    "id": "demo-inc-002",
+    "title": "Payment Service — 5xx Error Spike",
+    "severity": "SEV-2",
+    "status": "investigating",
+    "service": "payment-service",
+    "description": "Payment processing errors increased 300% in 15min"
+  },
+  {
+    "id": "demo-inc-003",
+    "title": "Database — Connection Pool Exhaustion",
+    "severity": "SEV-1",
+    "status": "resolved",
+    "service": "order-service",
+    "description": "Postgres max_connections reached during traffic spike"
+  },
+  {
+    "id": "demo-inc-004",
+    "title": "Redis — Memory Eviction Storm",
+    "severity": "SEV-3",
+    "status": "monitoring",
+    "service": "user-service",
+    "description": "Cache miss rate rose to 85% after maxmemory-policy change"
+  },
+  {
+    "id": "demo-inc-005",
+    "title": "Notification Service — Queue Backlog",
+    "severity": "SEV-4",
+    "status": "open",
+    "service": "notification-service",
+    "description": "SQS backlog grew to 50k messages after SES rate limit hit"
+  }
+]
