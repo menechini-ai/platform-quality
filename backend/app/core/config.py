@@ -60,5 +60,16 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = "redis://localhost:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"
 
+    # --- LLM / AI ---
+    OPENAI_API_KEY: str | None = None
+    OPENAI_BASE_URL: str | None = None
+    EMBED_MODEL: str = "text-embedding-3-small"
+    LITELLM_API_KEY: str | None = None
+    LITELLM_BASE_URL: str | None = None
+    LITELLM_DEFAULT_MODEL: str = "gpt-4o"
+    LANGFUSE_PUBLIC_KEY: str | None = None
+    LANGFUSE_SECRET_KEY: str | None = None
+    LANGFUSE_HOST: str | None = None
+
 
 settings = Settings()

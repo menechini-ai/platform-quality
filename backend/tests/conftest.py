@@ -22,6 +22,13 @@ if TYPE_CHECKING:
 # Use an in-memory SQLite for unit tests
 TEST_DATABASE_URL = "sqlite+aiosqlite://"
 
+# litellm calls load_dotenv() at import time, which reads backend/.env
+# and clobbers os.environ with test/override values. We strip those here
+# so that unit tests always start from a clean slate.
+for _key in list(os.environ):
+    if _key.startswith(("LITELLM_", "OPENAI_", "EMBED_", "LANGFUSE_")):
+        del os.environ[_key]
+
 
 @pytest.fixture(scope="session")
 def event_loop():

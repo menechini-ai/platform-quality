@@ -3,9 +3,19 @@ import { useState } from "react";
 import { Search, FileText } from "lucide-react";
 
 export function LogsPage() {
-  const [query, setQuery] = useState("*");
-  const [input, setInput] = useState("*");
-  const { data: logs, isLoading } = useDdLogs({ query, limit: 50 });
+  const [query, setQuery] = useState("");
+  const [input, setInput] = useState("");
+  const [tagsFilter, setTagsFilter] = useState("");
+  const [searched, setSearched] = useState(false);
+
+  const handleSearch = () => {
+    setQuery(input);
+    setSearched(true);
+  };
+
+  const { data: logs, isLoading } = useDdLogs(
+    searched ? { query, limit: 50, ...(tagsFilter ? { tags: tagsFilter } : {}) } : undefined,
+  );
 
   return (
     <div className="space-y-4">
@@ -28,21 +38,34 @@ export function LogsPage() {
             className="w-full pl-9 pr-3 py-2 rounded-lg bg-surface-700 border border-slate-700/50 text-sm text-white placeholder-slate-500 font-mono focus:outline-none focus:border-brand-500/50"
           />
         </div>
+        <input
+          type="text"
+          value={tagsFilter}
+          onChange={(e) => setTagsFilter(e.target.value)}
+          placeholder="Tags (e.g. env:prod)"
+          className="w-56 px-3 py-2 rounded-lg bg-surface-700 border border-slate-700/50 text-sm text-white placeholder-slate-500 font-mono focus:outline-none focus:border-brand-500/50"
+        />
         <button
-          onClick={() => setQuery(input)}
+          onClick={handleSearch}
           className="px-4 py-2 rounded-lg bg-brand-600/20 text-brand-400 text-sm font-mono border border-brand-500/20 hover:bg-brand-600/30 transition-colors"
         >
           Search
         </button>
       </div>
 
-      {isLoading ? (
+      {!searched ? (
+        <div className="glass rounded-xl p-12 text-center">
+          <Search className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+          <p className="text-slate-500 font-mono text-sm">Enter a query and click Search</p>
+          <p className="text-xs text-slate-600 mt-2 font-mono">Logs are filtered — no default * match-all</p>
+        </div>
+      ) : isLoading ? (
         <div className="animate-pulse text-slate-500 font-mono text-sm">Searching...</div>
       ) : !logs || logs.length === 0 ? (
         <div className="glass rounded-xl p-12 text-center">
           <FileText className="w-12 h-12 text-slate-600 mx-auto mb-3" />
           <p className="text-slate-500 font-mono text-sm">No logs match</p>
-          <p className="text-xs text-slate-600 mt-2 font-mono">Try: <span className="text-brand-400">service:* status:error</span> or <span className="text-brand-400">*</span> for all logs</p>
+          <p className="text-xs text-slate-600 mt-2 font-mono">Type a query above to search logs</p>
         </div>
       ) : (
         <div className="space-y-1">
@@ -57,7 +80,7 @@ export function LogsPage() {
                   </span>
                 )}
               </div>
-              <p className="text-slate-300 leading-relaxed line-clamp-3">{log.content}</p>
+              <p className="text-white leading-relaxed whitespace-pre-wrap break-words">{log.content}</p>
             </div>
           ))}
         </div>
