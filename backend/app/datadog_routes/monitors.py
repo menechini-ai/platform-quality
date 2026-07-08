@@ -40,6 +40,20 @@ async def list_monitors(
     return maybe_human(data, fmt_monitors, human, meta={"total": len(data)})
 
 
+@router.get("/datadog/monitors/search")
+async def search_monitors(
+    query: str | None = Query(default=None), page: int = 0, per_page: int = 10, human: bool = Query(False, alias="human")
+):
+    """Search monitors by name/tags."""
+    client = DatadogClient()
+    kwargs: dict[str, Any] = {}
+    if query:
+        kwargs["query"] = query
+    r = client.monitors.search_monitors(**kwargs, page=page, per_page=per_page)
+    data = r.to_dict()
+    return maybe_human(data, fmt_monitors, human)
+
+
 @router.get("/datadog/monitors/{monitor_id}")
 async def get_monitor(monitor_id: int):
     """Get a single monitor by ID."""
@@ -49,17 +63,6 @@ async def get_monitor(monitor_id: int):
         return r.to_dict()
     except Exception as e:
         raise HTTPException(status_code=404, detail=sanitize_error_message(str(e))) from e
-
-
-@router.get("/datadog/monitors/search")
-async def search_monitors(
-    query: str = "*", page: int = 0, per_page: int = 10, human: bool = Query(False, alias="human")
-):
-    """Search monitors by name/tags."""
-    client = DatadogClient()
-    r = client.monitors.search_monitors(query=query, page=page, per_page=per_page)
-    data = r.to_dict()
-    return maybe_human(data, fmt_monitors, human)
 
 
 @router.get("/datadog/monitors/groups/{monitor_id}")
