@@ -47,13 +47,9 @@ export function IncidentsPage() {
         return false;
       if (sevFilter && inc.severity !== sevFilter) return false;
       if (statFilter && inc.status !== statFilter) return false;
-      if (tagFilter.length > 0) {
-        const incTags = inc.tags ?? [];
-        if (!tagFilter.some((t) => incTags.includes(t))) return false;
-      }
       return true;
     });
-  }, [incidents, search, sevFilter, statFilter, tagFilter]);
+  }, [incidents, search, sevFilter, statFilter]);
 
   const clearFilters = () => {
     setSearch("");
