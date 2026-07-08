@@ -52,13 +52,10 @@ async def health_readiness(db: AsyncSession = Depends(get_db)):
     except Exception:
         checks["database"] = "down"
 
-    # Datadog config check
-    if settings.DATADOG_API_KEY:
-        checks["datadog"] = "configured"
-    else:
-        checks["datadog"] = "missing"
+    # Datadog config check (informational only — not required for readiness)
+    checks["datadog"] = "configured" if settings.DATADOG_API_KEY else "not_configured"
 
-    all_ok = all(v == "up" or v == "configured" for v in checks.values())
+    all_ok = checks["database"] == "up"
     status_code = 200 if all_ok else 503
     status_str = "ok" if all_ok else "degraded"
 
