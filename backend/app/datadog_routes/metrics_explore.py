@@ -5,6 +5,8 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 
 from app.datadog.client import DatadogClient
+from app.datadog.filters import compose_filters, to_domain_kwargs
+from app.datadog.schemas import DatadogFilter, Period
 from app.datadog.write_guard import sanitize_error_message
 
 router = APIRouter()
@@ -13,18 +15,25 @@ router = APIRouter()
 @router.get("/datadog/metrics/list")
 async def list_available_metrics(
     filter_tags: str = Query("*", description="Tag filter, e.g. 'env:prod', 'aws:*'"),
+    tags: list[str] | None = Query(
+        default=None, description="UST tags, AND-combined with global default"
+    ),
+    period: Period | None = Query(default=None, description="Time window: 1d, 7d, 15d, 30d"),
     limit: int = Query(50, le=200),
     cursor: str | None = None,
 ):
     """List Datadog metrics matching a tag filter.
 
-    Uses v2 Metrics API with filter[tags] param.
-    Example: /api/v1/datadog/metrics/list?filter_tags=env:prod,service:api
+    `tags` is AND-combined with the global default from settings into the comma-separated
+    tag filter passed to the Metrics API.
     """
+    composed = compose_filters(DatadogFilter(tags=tags, period=period))
+    fkw = to_domain_kwargs("metrics_explore", composed)
+    effective_tags = fkw.get("filter_tags", filter_tags)
     client = DatadogClient()
     try:
         r = client.metrics.list_metrics(
-            filter_tags=filter_tags,
+            filter_tags=effective_tags,
             page_size=limit,
             page_cursor=cursor or "",
         )

@@ -75,6 +75,18 @@ ships as an independently testable increment. Branch per gitflow: `001-observai-
 
 ---
 
+## Phase 7: Tag & Period Filtering (per-path + global) (P2, cross-cutting)
+
+- [ ] T070 [P] F — Add `DatadogFilter` Pydantic schema (`tags: list[str]`, `period ∈ {1d,7d,15d,30d}`) in `app/datadog/schemas.py`; add `DATADOG_DEFAULT_TAGS` + `DATADOG_DEFAULT_PERIOD` to `app/core/config.py` (P3: no `from __future__ import annotations`).
+- [ ] T071 [P] F — Test (unit, no Datadog): `DatadogFilter` validates `period` enum; `compose_filters(global, request)` AND-merges tags and falls back to global period.
+- [ ] T072 F — Add `app/datadog/filters.py::compose_filters` + period→`from`/`to` mapping + per-domain translation table; wire into `DatadogClient` call path (P1: logic in `app/datadog/`, not routers).
+- [ ] T073 [P] F — Test (unit, no Datadog): period `7d` → correct `from`/`to`; per-domain tag translation produces the expected native kwargs (monitors/logs/incidents/metrics/…).
+- [ ] T074 F — Accept `tags` + `period` on every `datadog_routes/*` list/search endpoint; retire ad-hoc `monitor_tags`/inline `tags`; keep domain `query` where needed.
+- [ ] T075 [P] F — Test: `GET /api/v1/datadog/monitors?tags=env:prod` with `DATADOG_DEFAULT_TAGS=team:sre` asserts merged request params (mock client); `@pytest.mark.datadog` integration test for one domain.
+- [ ] T076 F — Update OpenAPI docs (`/docs`) + README Datadog Proxy section to document `tags` + `period`.
+
+---
+
 ## Gitflow & Delivery
 
 - All tasks land on branch `001-observai-platform` (off `develop`); PR → `develop`; release PR `develop → main`.

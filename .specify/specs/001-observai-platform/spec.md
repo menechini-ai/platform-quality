@@ -192,6 +192,18 @@ credentialed test fails the guard.
 
 - **FR-030**: Every change MUST be merged via gitflow: feature/fix branch off `develop` → PR to `develop` → release PR `develop → main`; Docker build/push runs only on `main`. No `--no-verify`; Python deps added via `uv add`.
 
+**Datadog Proxy — Tag & Period Filtering**
+
+- **FR-031**: System MUST define a single shared filter schema (`DatadogFilter`) in `app/datadog/schemas.py` (Pydantic v2, NO `from __future__ import annotations`) covering: `tags: list[str] | None` (Datadog `key:value` tags, AND-combined) and a time-period filter `period: Literal["1d","7d","15d","30d"] | None` (maps to `from = now − N days`, `to = now`).
+- **FR-032**: System MUST accept `DatadogFilter` on every list/search endpoint of each `datadog_routes/*` domain (monitors, events, logs, metrics, metrics_explore, apm, incidents, fleet, rum, slos, synthetics, error_tracking) as an **individual (per-path) filter** — an explicit request-time override for that path.
+- **FR-033**: System MUST support a **global filter** (default `tags` + optional default `period`) configured via settings (`DATADOG_DEFAULT_TAGS`, `DATADOG_DEFAULT_PERIOD`), automatically applied to every `datadog_routes/*` call and merged (AND) with any per-request individual filter; the global period is the fallback when the request omits `period`.
+- **FR-034**: Filter composition (merge global + individual, map `period` → `from`/`to`, and translate the uniform `tags`/`period` into each domain's native Datadog parameter — monitors `tags`/`monitor_tags`, logs/spans `filter.tags`, incidents/events/rum `query` with `tags:...`, metrics `query{...}` / `filter[tags]`, SLOs/synthetics/fleet/error-tracking/apm `tags` / `filter[tags]`) MUST live in `app/datadog/` (client or a `filters` helper), NOT in routers (Constitution P1).
+- **FR-035**: Filter translation and merge MUST be unit-testable without live Datadog calls (no `DD_API_KEY`/`DD_APP_KEY`); per-domain call tests MUST carry `@pytest.mark.datadog` (FR-020).
+
+**Success Criteria**
+
+- **SC-009**: `GET /api/v1/datadog/monitors?tags=env:prod` (individual) together with `DATADOG_DEFAULT_TAGS=team:sre` (global) yields a Datadog call scoped to BOTH `env:prod` AND `team:sre`; `?period=7d` sets `from`/`to` to the trailing 7 days. No live call is required to assert the merged request parameters.
+
 ### Key Entities *(include if feature involves data)*
 
 - **Incident**: an alert/ticket under investigation. Attributes: id (UUID), title, description, status, severity, timestamps. Related to RcaReport and AutoHealAction.

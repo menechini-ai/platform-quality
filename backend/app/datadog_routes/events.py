@@ -5,7 +5,9 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 
 from app.datadog.client import DatadogClient
+from app.datadog.filters import compose_filters, to_domain_kwargs
 from app.datadog.formatters import fmt_events, maybe_human
+from app.datadog.schemas import DatadogFilter, Period
 from app.datadog.write_guard import assert_write_allowed, sanitize_error_message
 
 router = APIRouter()
@@ -17,30 +19,30 @@ async def list_events(
     end: int | None = None,
     priority: str | None = None,
     sources: str | None = None,
-    tags: str | None = None,
+    tags: list[str] | None = Query(default=None, description="Tag filter (env:prod, service:api)"),
+    period: Period | None = Query(default=None, description="Time window: 1d, 7d, 15d, 30d"),
     human: bool = Query(False, alias="human"),
 ):
     """List Datadog events with optional filters."""
     from datetime import UTC, datetime
 
+    composed = compose_filters(DatadogFilter(tags=tags, period=period))
+    fkw = to_domain_kwargs("events", composed)
+
     kwargs: dict[str, object] = {}
-    if start:
-        kwargs["start"] = start
-    if end:
-        kwargs["end"] = end
     if priority:
         kwargs["priority"] = priority
     if sources:
         kwargs["sources"] = sources.replace(",", ",")
-    if tags:
-        kwargs["tags"] = tags
+    if "tags" in fkw:
+        kwargs["tags"] = fkw["tags"]
 
     client = DatadogClient()
-    # SDK requires start/end; default to last 24h
+    # SDK requires start/end; default to last 24h, override with period when given
     now = int(datetime.now(UTC).timestamp())
     r = client.events.list_events(
-        start=kwargs.pop("start", now - 86400),
-        end=kwargs.pop("end", now),
+        start=fkw.get("start", start or now - 86400),
+        end=fkw.get("end", end or now),
         **kwargs,
     )
     data = r.to_dict()

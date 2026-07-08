@@ -133,9 +133,48 @@ behavior inside these modules; Phase B refactors `rca/` internally only.
 - E1 Instrument ObservAI with its own Datadog (latency, RCA success, self-heal counts, auth events).
 - E2 Ship platform-health dashboard.
 
+**Phase F — Tag & Period Filtering (per-path + global)** (cross-cutting Datadog proxy)
+- F1 Shared `DatadogFilter` schema: `tags: list[str]` (AND) + `period ∈ {1d,7d,15d,30d}` → `from`/`to`.
+- F2 Individual filter on every `datadog_routes/*` list/search endpoint (retire ad-hoc `tags`/`monitor_tags`/`query` inconsistencies).
+- F3 Global filter via settings (`DATADOG_DEFAULT_TAGS`, `DATADOG_DEFAULT_PERIOD`), merged AND in `app/datadog/`.
+- F4 `compose_filters` + period mapping + per-domain translation in `app/datadog/` (routers stay thin, P1).
+- F5 Unit tests for merge/period/translation; per-domain tests `@pytest.mark.datadog` (TDD).
+
 ## Definition of Done (per change)
 
 Pre-commit 7/7 + CI green (backend + frontend; docker on `main`); new behavior has tests; Datadog tests
 marked & skippable; `pyright` clean on changed files; no new `vulture` findings; `/docs` updated if a
 route changed; README/PLAN.md updated if a module changed; no env-dependent assertions; merged via
 gitflow.
+
+## Tag & Period Filtering (Feature Addition)
+
+**Summary**: Today each `datadog_routes/*` router declares query params inline and inconsistently — only
+`monitors.py` exposes `tags`/`monitor_tags`; `incidents`/`logs`/`rum` use a free-form `query` string; the
+rest have none. There is no shared schema and no global/cross-path filter. This addition introduces one
+uniform `DatadogFilter` (tags + period) accepted individually on every path, plus a global default
+applied to all paths, with all composition logic centralized in `app/datadog/`.
+
+**Technical Approach**
+- *Shared schema* — `app/datadog/schemas.py::DatadogFilter`: `tags: list[str] | None` (Datadog
+  `key:value`, AND-combined) and `period: Literal["1d","7d","15d","30d"] | None`. `period` maps to
+  `from_ts = now − N·86400`, `to_ts = now`. No `from __future__ import annotations`.
+- *Individual filter* — every `datadog_routes/*` list/search endpoint accepts `tags` + `period` (and keeps
+  a domain `query` where the Datadog API needs free text). Ad-hoc `monitor_tags`/inline `tags` are unified
+  into the shared model.
+- *Global filter* — `app/core/config.py` adds `DATADOG_DEFAULT_TAGS: list[str]` and
+  `DATADOG_DEFAULT_PERIOD: Literal[...] | None`. A `compose_filters(global, request)` helper in
+  `app/datadog/filters.py` AND-merges tags and applies the global period as fallback.
+- *Per-domain translation* — `DatadogClient` (or per-method kwargs) maps the uniform filter to each
+  domain's native param: monitors `tags`/`monitor_tags`; logs & spans `filter.tags` + `from`/`to`;
+  incidents/events/rum `query` with `tags:...`; metrics `query{...}` / `filter[tags]`;
+  SLOs/synthetics/fleet/error-tracking/apm `tags` / `filter[tags]`.
+- *Constitution* — P1: composition/translation in `app/datadog/`, routers stay thin. P2: TDD; integration
+  tests `@pytest.mark.datadog`. P3: Pydantic v2 schema, `pyright` clean.
+
+**Affected files**: `app/datadog/schemas.py` (new), `app/datadog/filters.py` (new), `app/core/config.py`,
+`app/datadog/client.py`, `app/datadog_routes/{monitors,incidents,logs,rum,metrics,metrics_explore,apm,
+events,fleet,slos,synthetics,error_tracking}.py`, `backend/tests/test_datadog_routes/test_filters.py`
+(new, unit) + per-domain `@pytest.mark.datadog` tests.
+
+**Branch**: `feature/tag-filters` off `develop` → PR to `develop`.
