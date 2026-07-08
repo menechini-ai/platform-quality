@@ -1,9 +1,17 @@
 """Alembic environment configuration."""
 
+import sys
 from logging.config import fileConfig
+from pathlib import Path
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+
+# Ensure project root is on sys.path — needed when running inside Docker
+# where editable installs may not resolve properly.
+_project_root = str(Path(__file__).parent.parent)
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
 
 from app.core.config import settings
 from app.core.db import Base
