@@ -7,7 +7,9 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 
 from app.datadog.client import DatadogClient
+from app.datadog.filters import compose_filters, to_domain_kwargs
 from app.datadog.formatters import fmt_monitors, maybe_human
+from app.datadog.schemas import DatadogFilter, Period
 from app.datadog.write_guard import assert_write_allowed, sanitize_error_message
 
 router = APIRouter()
@@ -17,22 +19,21 @@ router = APIRouter()
 async def list_monitors(
     group: str | None = None,
     name: str | None = None,
-    tags: str | None = None,
-    monitor_tags: str | None = None,
+    tags: list[str] | None = Query(default=None, description="Tag filter (env:prod, service:api)"),
+    period: Period | None = Query(default=None, description="Time window: 1d, 7d, 15d, 30d"),
     page_size: int = 50,
     page: int = 0,
     human: bool = Query(False, alias="human"),
 ):
-    """List Datadog monitors with optional filters."""
+    """List Datadog monitors with optional tag + period filters."""
     kwargs: dict[str, Any] = {}
     if group:
         kwargs["group"] = group
     if name:
         kwargs["name"] = name
-    if tags:
-        kwargs["tags"] = tags
-    if monitor_tags:
-        kwargs["monitor_tags"] = monitor_tags
+    kwargs.update(
+        to_domain_kwargs("monitors", compose_filters(DatadogFilter(tags=tags, period=period)))
+    )
 
     client = DatadogClient()
     r = client.monitors.list_monitors(**kwargs, page_size=page_size, page=page)

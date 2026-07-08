@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
 
+from app.datadog.filters import compose_filters, to_domain_kwargs
 from app.datadog.formatters import fmt_synthetics, maybe_human
+from app.datadog.schemas import DatadogFilter, Period
 from app.datadog.write_guard import get_datadog_url, get_headers, sanitize_error_message
 
 router = APIRouter()
@@ -12,15 +14,23 @@ router = APIRouter()
 
 @router.get("/datadog/synthetics")
 async def list_synthetics(
-    limit: int = Query(50, le=200), human: bool = Query(False, alias="human")
+    tags: list[str] | None = Query(default=None, description="Tag filter (env:prod, service:api)"),
+    period: Period | None = Query(default=None, description="Time window: 1d, 7d, 15d, 30d"),
+    limit: int = Query(50, le=200),
+    human: bool = Query(False, alias="human"),
 ):
     """List synthetic tests."""
     import httpx
 
+    composed = compose_filters(DatadogFilter(tags=tags, period=period))
+    fkw = to_domain_kwargs("synthetics", composed)
     try:
         async with httpx.AsyncClient() as hc:
             url = f"{get_datadog_url()}/api/v1/synthetics/tests"
-            resp = await hc.get(url, headers=get_headers(), params={"limit": limit})
+            params: dict = {"limit": limit}
+            if "tags" in fkw:
+                params["tags"] = fkw["tags"]
+            resp = await hc.get(url, headers=get_headers(), params=params)
             resp.raise_for_status()
             data = resp.json().get("tests", [])
             return maybe_human(data, fmt_synthetics, human, meta={"total": len(data)})

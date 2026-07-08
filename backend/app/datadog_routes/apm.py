@@ -7,7 +7,9 @@ from datetime import UTC
 from fastapi import APIRouter, HTTPException, Query
 
 from app.datadog.client import DatadogClient
+from app.datadog.filters import compose_filters, to_domain_kwargs
 from app.datadog.formatters import fmt_spans, maybe_human
+from app.datadog.schemas import DatadogFilter, Period
 from app.datadog.write_guard import sanitize_error_message
 
 router = APIRouter()
@@ -16,6 +18,8 @@ router = APIRouter()
 @router.get("/datadog/apm/services")
 async def list_services(
     env: str = "prod",
+    tags: list[str] | None = Query(default=None, description="Tag filter (env:prod, service:api)"),
+    period: Period | None = Query(default=None, description="Time window: 1d, 7d, 15d, 30d"),
     human: bool = Query(False, alias="human"),
 ):
     """List APM services.
@@ -23,20 +27,25 @@ async def list_services(
     Note: Datadog's Spans API doesn't have a direct 'list services' endpoint.
     This wraps span aggregation by service for recent data.
     """
+    composed = compose_filters(DatadogFilter(tags=tags, period=period))
+    fkw = to_domain_kwargs("apm", composed)
     client = DatadogClient()
     from datetime import datetime
 
     now = int(datetime.now(UTC).timestamp())
+    from_ts = fkw.get("from", now - 3600 * 24 * 7)
+    to_ts = fkw.get("to", now)
+    query = " ".join(p for p in [f"env:{env}", fkw.get("query")] if p)
 
     try:
         r = client.aggregate_spans(
-            filter_query=f"env:{env}",
+            filter_query=query,
             compute={"aggregation": "count"},
             group_by=[{"facet": "service"}, {"facet": "resource"}],
-            filter_from=now - 3600 * 24 * 7,  # 7 days
-            filter_to=now,
+            filter_from=from_ts,
+            filter_to=to_ts,
         )
-        return maybe_human(r, fmt_spans, human, meta={"query": f"env:{env}"})
+        return maybe_human(r, fmt_spans, human, meta={"query": query})
     except Exception as e:
         raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
 
@@ -46,12 +55,16 @@ async def list_spans(
     query: str | None = Query(default=None),
     service: str | None = None,
     env: str | None = None,
+    tags: list[str] | None = Query(default=None, description="Tag filter (env:prod, service:api)"),
+    period: Period | None = Query(default=None, description="Time window: 1d, 7d, 15d, 30d"),
     limit: int = Query(default=50, le=200),
     from_ts: int | None = None,
     to_ts: int | None = None,
     human: bool = Query(False, alias="human"),
 ):
     """Search APM traces/spans."""
+    composed = compose_filters(DatadogFilter(tags=tags, period=period))
+    fkw = to_domain_kwargs("apm", composed)
     client = DatadogClient()
     filters: list[str] = []
     if query:
@@ -60,6 +73,8 @@ async def list_spans(
         filters.append(f"service:{service}")
     if env:
         filters.append(f"env:{env}")
+    if "query" in fkw:
+        filters.append(fkw["query"])
     combined = " ".join(filters)
 
     try:
@@ -67,8 +82,8 @@ async def list_spans(
             combined,
             limit=limit,
             sort="-timestamp",
-            filter_from=from_ts,
-            filter_to=to_ts,
+            filter_from=fkw.get("from", from_ts),
+            filter_to=fkw.get("to", to_ts),
         )
         return maybe_human(r, fmt_spans, human, meta={"query": combined})
     except Exception as e:
@@ -79,6 +94,8 @@ async def list_spans(
 async def list_resources(
     service: str | None = None,
     env: str = "prod",
+    tags: list[str] | None = Query(default=None, description="Tag filter (env:prod, service:api)"),
+    period: Period | None = Query(default=None, description="Time window: 1d, 7d, 15d, 30d"),
     limit: int = Query(default=50, le=200),  # noqa: ARG001
     human: bool = Query(False, alias="human"),
 ):
@@ -86,21 +103,27 @@ async def list_resources(
 
     Returns top resources by span count for each service.
     """
+    composed = compose_filters(DatadogFilter(tags=tags, period=period))
+    fkw = to_domain_kwargs("apm", composed)
     client = DatadogClient()
     from datetime import datetime
 
     now = int(datetime.now(UTC).timestamp())
+    from_ts = fkw.get("from", now - 3600 * 24 * 7)
+    to_ts = fkw.get("to", now)
 
     service_filter = f"service:{service}" if service else ""
+    base = f"env:{env} {service_filter}".strip() if service_filter else f"env:{env}"
+    query = " ".join(p for p in [base, fkw.get("query")] if p)
     try:
         r = client.aggregate_spans(
-            filter_query=f"env:{env} {service_filter}".strip() if service_filter else f"env:{env}",
+            filter_query=query,
             compute={"aggregation": "count"},
             group_by=[{"facet": "service"}, {"facet": "resource"}, {"facet": "operation_name"}],
-            filter_from=now - 3600 * 24 * 7,
-            filter_to=now,
+            filter_from=from_ts,
+            filter_to=to_ts,
         )
-        return maybe_human(r, fmt_spans, human, meta={"query": f"env:{env} {service_filter}"})
+        return maybe_human(r, fmt_spans, human, meta={"query": query})
     except Exception as e:
         raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
 

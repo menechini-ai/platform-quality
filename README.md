@@ -360,6 +360,16 @@ All endpoints are prefixed with `/api/v1` unless noted. The root `GET /health` i
 
 All proxy the official Datadog client; the browser never holds Datadog keys.
 
+Every list endpoint accepts optional tag + period filtering, merged with global defaults
+(`DATADOG_DEFAULT_TAGS`, `DATADOG_DEFAULT_PERIOD`):
+
+- `tags` (array) — filter by Datadog tags, e.g. `["env:prod", "team:observai"]`.
+  Per domain, tags are mapped onto the correct Datadog parameter (monitors/events/synthetics
+  use a comma string; logs/spans/RUM/APM ride the query string; metrics use `filter_tags`;
+  SLOs use `tags_query`; incidents route through `search_incidents`).
+- `period` (enum) — `1d`, `7d`, `15d`, or `30d`; translates to the domain's `from`/`to`
+  time window.
+
 | Domain | Example endpoints |
 |--------|-------------------|
 | APM | `/api/v1/datadog/apm/services`, `/.../services/{name}/definition`, `/.../dependencies`, `/.../spans` |

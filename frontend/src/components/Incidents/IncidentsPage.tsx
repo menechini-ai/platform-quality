@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useIncidents } from "@/api/client";
-import { TagFilter } from "@/components/TagFilter/TagFilter";
 import {
   AlertTriangle,
   Clock,
@@ -29,10 +28,7 @@ const severities = ["SEV-1", "SEV-2", "SEV-3", "SEV-4", "SEV-5"];
 const statuses = ["active", "stable", "resolved"];
 
 export function IncidentsPage() {
-  const [tagFilter, setTagFilter] = useState<string[]>([]);
-  const { data: incidents, isLoading } = useIncidents(
-    tagFilter.length > 0 ? { tags: tagFilter.join(",") } : undefined
-  );
+  const { data: incidents, isLoading } = useIncidents();
   const navigate = useNavigate();
 
   const [search, setSearch] = useState("");
@@ -47,13 +43,9 @@ export function IncidentsPage() {
         return false;
       if (sevFilter && inc.severity !== sevFilter) return false;
       if (statFilter && inc.status !== statFilter) return false;
-      if (tagFilter.length > 0) {
-        const incTags = inc.tags ?? [];
-        if (!tagFilter.some((t) => incTags.includes(t))) return false;
-      }
       return true;
     });
-  }, [incidents, search, sevFilter, statFilter, tagFilter]);
+  }, [incidents, search, sevFilter, statFilter]);
 
   const clearFilters = () => {
     setSearch("");
@@ -121,17 +113,16 @@ export function IncidentsPage() {
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2 border-t border-slate-700/30 pt-3">
-          <TagFilter tags={tagFilter} onChange={setTagFilter} placeholder="filter by tag..." />
-          {(hasFilters || tagFilter.length > 0) && (
+        {hasFilters && (
+          <div className="flex justify-end border-t border-slate-700/30 pt-3">
             <button
-              onClick={() => { clearFilters(); setTagFilter([]); }}
-              className="text-xs text-slate-500 hover:text-slate-300 ml-auto"
+              onClick={clearFilters}
+              className="text-xs text-slate-500 hover:text-slate-300"
             >
               Clear all
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* List */}

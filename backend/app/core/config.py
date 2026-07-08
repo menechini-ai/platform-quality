@@ -1,5 +1,7 @@
 """Global configuration via pydantic-settings."""
 
+from typing import Literal
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -41,6 +43,10 @@ class Settings(BaseSettings):
     DATADOG_API_KEY: str | None = None
     DATADOG_APP_KEY: str | None = None
     DATADOG_SITE: str = "datadoghq.com"
+
+    # --- Datadog global filter (applied to every datadog_routes/* call) ---
+    DATADOG_DEFAULT_TAGS: list[str] = []
+    DATADOG_DEFAULT_PERIOD: Literal["1d", "7d", "15d", "30d"] | None = None
 
     # --- Auth ---
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
