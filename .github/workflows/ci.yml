@@ -64,7 +64,7 @@ jobs:
       - name: Validate pre-commit hooks
         run: |
           . .venv/bin/activate
-          SKIP=eslint,typescript pre-commit run --all-files --show-diff-on-failure
+          SKIP=eslint,tsc pre-commit run --all-files --show-diff-on-failure
         continue-on-error: false
 
   frontend:
