@@ -61,7 +61,7 @@ export interface DdLog {
 
 export function useDdLogs(filters?: { query?: string; limit?: number }) {
   const params = new URLSearchParams();
-  params.set("query", filters?.query ?? "*");
+  if (filters?.query) params.set("query", filters.query);
   params.set("limit", String(filters?.limit ?? 50));
   params.set("sort", "-timestamp");
 
