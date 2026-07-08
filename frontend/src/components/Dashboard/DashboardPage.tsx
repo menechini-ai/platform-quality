@@ -188,8 +188,8 @@ export function DashboardPage() {
 
       {/* Trends — sparklines */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <TrendSparklineCard title="CPU Trend (24h)" metric="avg:system.cpu.user{*} by {host}.rollup(avg, 3600)" />
-        <TrendSparklineCard title="Memory Trend (24h)" metric="avg:system.mem.used{*} by {host}.rollup(avg, 3600)" />
+        <TrendSparklineCard title="CPU Trend (24h)" metric="system.cpu.user" />
+        <TrendSparklineCard title="Memory Trend (24h)" metric="system.mem.used" />
       </div>
     </div>
   );
