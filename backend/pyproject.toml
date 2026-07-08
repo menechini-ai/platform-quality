@@ -8,6 +8,7 @@ dependencies = [
     "uvicorn[standard]>=0.30.0,<1",
     "sqlalchemy[asyncio]>=2.0.0,<3",
     "asyncpg>=0.29.0,<1",
+    "psycopg2-binary>=2.9.0,<3",  # sync driver for Alembic migrations (env.py strips +asyncpg)
     "alembic>=1.13.0,<2",
     "pydantic>=2.0.0,<3",
     "pydantic-settings>=2.0.0,<3",
