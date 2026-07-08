@@ -1,14 +1,9 @@
 """Pydantic schemas for maturity assessments."""
 
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
+from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel
-
-if TYPE_CHECKING:
-    import uuid
-    from datetime import datetime
 
 
 class MaturityDimension(BaseModel):
@@ -20,7 +15,7 @@ class MaturityDimension(BaseModel):
 
 
 class MaturityAssessmentRead(BaseModel):
-    id: uuid.UUID
+    id: UUID
     overall_level: int
     overall_score: float
     dimensions: dict

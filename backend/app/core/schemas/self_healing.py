@@ -1,14 +1,10 @@
 """Pydantic schemas for Self-Healing."""
 
-from __future__ import annotations
-
-from typing import TYPE_CHECKING, Any
+from datetime import datetime
+from typing import Any
+from uuid import UUID
 
 from pydantic import BaseModel
-
-if TYPE_CHECKING:
-    import uuid
-    from datetime import datetime
 
 
 class RunbookCreate(BaseModel):
@@ -20,7 +16,7 @@ class RunbookCreate(BaseModel):
 
 
 class RunbookRead(BaseModel):
-    id: uuid.UUID
+    id: UUID
     name: str
     description: str | None = None
     triggers: Any | None = None
@@ -32,8 +28,8 @@ class RunbookRead(BaseModel):
 
 
 class AutoHealActionRead(BaseModel):
-    id: uuid.UUID
-    incident_id: uuid.UUID | None = None
+    id: UUID
+    incident_id: UUID | None = None
     monitor_id: str | None = None
     action_type: str
     action_config: Any | None = None

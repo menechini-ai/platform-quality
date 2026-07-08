@@ -1,14 +1,9 @@
 """Pydantic schemas for reports."""
 
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
+from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, Field
-
-if TYPE_CHECKING:
-    import uuid
-    from datetime import datetime
 
 
 class ReportCreate(BaseModel):
@@ -22,7 +17,7 @@ class ReportCreate(BaseModel):
 
 
 class ReportRead(BaseModel):
-    id: uuid.UUID
+    id: UUID
     report_type: str
     title: str
     content: str

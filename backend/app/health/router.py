@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import UTC
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 
 from app.core.db import get_db
 from app.core.models.health import HealthSnapshot, Slo
@@ -20,6 +20,54 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
+
+
+# ─── Liveness / Readiness ──────────────────────────────
+
+
+@router.get("/health")
+async def health_liveness():
+    """Liveness probe — always 200 if the process is alive."""
+    from app.core.config import settings
+
+    return {
+        "status": "ok",
+        "version": "0.1.0",
+        "app": settings.APP_NAME,
+        "timestamp": datetime.now(UTC).isoformat(),
+    }
+
+
+@router.get("/readyz")
+async def health_readiness(db: AsyncSession = Depends(get_db)):
+    """Readiness probe — checks DB connectivity and critical config."""
+    from app.core.config import settings
+
+    checks: dict[str, str] = {}
+
+    # Database check
+    try:
+        await db.execute(text("SELECT 1"))
+        checks["database"] = "up"
+    except Exception:
+        checks["database"] = "down"
+
+    # Datadog config check
+    if settings.DATADOG_API_KEY:
+        checks["datadog"] = "configured"
+    else:
+        checks["datadog"] = "missing"
+
+    all_ok = all(v == "up" or v == "configured" for v in checks.values())
+    status_code = 200 if all_ok else 503
+    status_str = "ok" if all_ok else "degraded"
+
+    from starlette.responses import JSONResponse
+
+    return JSONResponse(
+        content={"status": status_str, "checks": checks},
+        status_code=status_code,
+    )
 
 
 # --- SLOs ---
@@ -51,7 +99,7 @@ async def create_slo(data: SloCreate, db: AsyncSession = Depends(get_db)):
 # --- Health Snapshots ---
 
 
-@router.get("/health", response_model=list[HealthSnapshotRead])
+@router.get("/health/snapshots", response_model=list[HealthSnapshotRead])
 async def list_health_snapshots(
     service: str | None = Query(None),
     status: str | None = Query(None, pattern=r"^(healthy|warning|critical)$"),

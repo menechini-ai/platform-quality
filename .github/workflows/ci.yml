@@ -2,9 +2,13 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [develop, main]
   pull_request:
-    branches: [main]
+    branches: [develop, main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_OWNER: ${{ github.repository_owner }}
 
 jobs:
   backend:
@@ -46,13 +50,19 @@ jobs:
       - name: Lint (ruff)
         run: ruff check app/ tests/
 
-      - name: Type check (mypy)
-        run: mypy app/
+      - name: Type check (pyright)
+        uses: jakebailey/pyright-action@v2
+        with:
+          working-directory: backend
 
-      - name: Test
-        run: python -m pytest tests/ -v --cov=app --cov-report=term-missing
+      - name: Test (unit)
+        run: python -m pytest tests/ -m "not datadog" -v --cov=app --cov-report=term-missing
         env:
           DATABASE_URL: postgresql+asyncpg://observai:observai@localhost:5432/observai
+
+      - name: Validate pre-commit hooks
+        run: pre-commit run --all-files --show-diff-on-failure
+        continue-on-error: false
 
   frontend:
     runs-on: ubuntu-latest
@@ -70,8 +80,50 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Lint (ESLint)
+        run: npm run lint
+
       - name: Type check
         run: npx tsc --noEmit
 
+      - name: Unit tests
+        run: npm run test
+
       - name: Build
         run: npm run build
+
+  docker:
+    if: github.ref == 'refs/heads/main'
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/platform-quality/backend:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/platform-quality/backend:${{ github.sha }}
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/platform-quality/frontend:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/platform-quality/frontend:${{ github.sha }}
