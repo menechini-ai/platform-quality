@@ -121,7 +121,9 @@ jobs:
         run: npm ci
 
       - name: Run pre-commit
-        run: pre-commit run --all-files
+        run: |
+          . backend/.venv/bin/activate
+          pre-commit run --all-files
 
   docker:
     if: github.ref == 'refs/heads/main'
