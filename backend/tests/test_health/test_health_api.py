@@ -45,7 +45,29 @@ async def test_health_summary_empty(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_list_health_snapshots(client: AsyncClient):
-    """GET /api/v1/health returns snapshots if any exist."""
-    response = await client.get("/api/v1/health")
+    """GET /api/v1/health/snapshots returns snapshots if any exist."""
+    response = await client.get("/api/v1/health/snapshots")
     assert response.status_code == 200
     assert isinstance(response.json(), list)
+
+
+@pytest.mark.asyncio
+async def test_health_liveness(client: AsyncClient):
+    """GET /api/v1/health returns liveness probe (always 200)."""
+    response = await client.get("/api/v1/health")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert "version" in data
+    assert "timestamp" in data
+
+
+@pytest.mark.asyncio
+async def test_readyz_healthy(client: AsyncClient):
+    """GET /api/v1/readyz returns 200 when DB is connected."""
+    response = await client.get("/api/v1/readyz")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert "database" in data["checks"]
+    assert data["checks"]["database"] == "up"

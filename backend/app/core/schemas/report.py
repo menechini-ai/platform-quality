@@ -1,9 +1,7 @@
 """Pydantic schemas for reports."""
 
-from __future__ import annotations
-
-import uuid
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -19,7 +17,7 @@ class ReportCreate(BaseModel):
 
 
 class ReportRead(BaseModel):
-    id: uuid.UUID
+    id: UUID
     report_type: str
     title: str
     content: str

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from uuid import UUID
+from typing import TYPE_CHECKING
+from uuid import UUID  # noqa: TC003 — needed at runtime for FastAPI path param resolution
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import String, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.deps import get_current_user
 from app.core.db import get_db
 from app.core.models.incident import Incident, IncidentTimeline
 from app.core.schemas.incident import (
@@ -17,6 +19,12 @@ from app.core.schemas.incident import (
     TimelineEventCreate,
     TimelineEventRead,
 )
+
+if TYPE_CHECKING:
+    from app.auth.schemas import UserInfo
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(tags=["incidents"])
 
@@ -108,6 +116,7 @@ async def get_incident(incident_id: UUID, db: AsyncSession = Depends(get_db)):
 async def create_incident(
     data: IncidentCreate,
     db: AsyncSession = Depends(get_db),
+    _: UserInfo = Depends(get_current_user),
 ):
     """Create a new incident."""
     incident = Incident(
@@ -132,6 +141,7 @@ async def update_incident(
     incident_id: UUID,
     data: IncidentUpdate,
     db: AsyncSession = Depends(get_db),
+    _: UserInfo = Depends(get_current_user),
 ):
     """Update an incident."""
     result = await db.execute(select(Incident).where(Incident.id == incident_id))
@@ -148,7 +158,11 @@ async def update_incident(
 
 
 @router.delete("/incidents/{incident_id}", status_code=204)
-async def delete_incident(incident_id: UUID, db: AsyncSession = Depends(get_db)):
+async def delete_incident(
+    incident_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _: UserInfo = Depends(get_current_user),
+):
     """Delete an incident."""
     result = await db.execute(select(Incident).where(Incident.id == incident_id))
     incident = result.scalar_one_or_none()
@@ -184,6 +198,7 @@ async def create_timeline_event(
     incident_id: UUID,
     data: TimelineEventCreate,
     db: AsyncSession = Depends(get_db),
+    _: UserInfo = Depends(get_current_user),
 ):
     """Add a timeline event to an incident."""
     event = IncidentTimeline(

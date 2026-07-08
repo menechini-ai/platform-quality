@@ -1,9 +1,7 @@
 """Pydantic schemas for Incidents."""
 
-from __future__ import annotations
-
-import uuid
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -44,8 +42,8 @@ class TimelineEventCreate(BaseModel):
 
 
 class TimelineEventRead(BaseModel):
-    id: uuid.UUID
-    incident_id: uuid.UUID
+    id: UUID
+    incident_id: UUID
     event_type: str
     content: str | None = None
     author: str | None = None
@@ -55,7 +53,7 @@ class TimelineEventRead(BaseModel):
 
 
 class IncidentRead(BaseModel):
-    id: uuid.UUID
+    id: UUID
     title: str
     description: str | None = None
     severity: str

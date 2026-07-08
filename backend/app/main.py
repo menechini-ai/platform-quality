@@ -40,6 +40,7 @@ def create_app() -> FastAPI:
 
     # Routers
     from app.analysis.router import router as analysis_router
+    from app.auth.router import router as auth_router
     from app.datadog_routes.apm import router as apm_router
     from app.datadog_routes.error_tracking import router as error_tracking_router
     from app.datadog_routes.events import router as events_router
@@ -61,6 +62,7 @@ def create_app() -> FastAPI:
     from app.self_healing.router import router as self_healing_router
 
     prefix = settings.API_V1_PREFIX
+    app.include_router(auth_router, prefix=prefix, tags=["auth"])
     app.include_router(incidents_router, prefix=prefix, tags=["incidents"])
     app.include_router(rca_router, prefix=prefix, tags=["rca"])
     app.include_router(health_router, prefix=prefix, tags=["health"])
