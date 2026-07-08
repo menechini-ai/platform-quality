@@ -23,7 +23,9 @@ class Report(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
-    report_type = Column(String(50), nullable=False)  # executive | monthly | team_health | postmortem | investigation
+    report_type = Column(
+        String(50), nullable=False
+    )  # executive | monthly | team_health | postmortem | investigation
     title = Column(String(500), nullable=False)
     content = Column(Text, nullable=False)  # Markdown
     tags = Column(JSON, nullable=True, default=list)

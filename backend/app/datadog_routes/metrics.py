@@ -16,7 +16,9 @@ async def query_metrics(
     metric: str = Query(..., description="Metric name, e.g. 'system.cpu.user'"),
     agg: str = Query("avg", description="Aggregation: avg, sum, max, min, count"),
     tags: str = Query("*", description="Tag filter, e.g. 'service:api,env:prod'"),
-    scope: str | None = Query(None, description="Full scope override, e.g. 'service:api AND env:prod'"),
+    scope: str | None = Query(
+        None, description="Full scope override, e.g. 'service:api AND env:prod'"
+    ),
     from_ts: int | None = None,
     to_ts: int | None = None,
     days: int = Query(1, ge=1, le=30),

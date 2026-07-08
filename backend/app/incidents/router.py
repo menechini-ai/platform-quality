@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from uuid import UUID
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
 from app.core.models.incident import Incident, IncidentTimeline
@@ -18,6 +17,11 @@ from app.core.schemas.incident import (
     TimelineEventRead,
 )
 
+if TYPE_CHECKING:
+    from uuid import UUID
+
+    from sqlalchemy.ext.asyncio import AsyncSession
+
 router = APIRouter(tags=["incidents"])
 
 
@@ -26,7 +30,9 @@ async def list_incidents(
     status: str | None = Query(None, pattern=r"^(active|stable|resolved)$"),
     severity: str | None = Query(None, pattern=r"^SEV-[1-5]$"),
     service: str | None = None,
-    failure_pattern: str | None = Query(None, pattern=r"^(deploy|resource|latency|dependency|data_corruption)$"),
+    failure_pattern: str | None = Query(
+        None, pattern=r"^(deploy|resource|latency|dependency|data_corruption)$"
+    ),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
@@ -49,24 +55,32 @@ async def list_incidents(
 @router.get("/incidents/summary")
 async def incident_summary(db: AsyncSession = Depends(get_db)):
     """Return counts by severity, status, service, failure_pattern."""
-    sev = (await db.execute(
-        select(Incident.severity, func.count(Incident.id).label("cnt"))
-        .group_by(Incident.severity)
-    )).all()
-    status = (await db.execute(
-        select(Incident.status, func.count(Incident.id).label("cnt"))
-        .group_by(Incident.status)
-    )).all()
-    svc = (await db.execute(
-        select(Incident.service, func.count(Incident.id).label("cnt"))
-        .where(Incident.service.isnot(None))
-        .group_by(Incident.service)
-    )).all()
-    pattern = (await db.execute(
-        select(Incident.failure_pattern, func.count(Incident.id).label("cnt"))
-        .where(Incident.failure_pattern.isnot(None))
-        .group_by(Incident.failure_pattern)
-    )).all()
+    sev = (
+        await db.execute(
+            select(Incident.severity, func.count(Incident.id).label("cnt")).group_by(
+                Incident.severity
+            )
+        )
+    ).all()
+    status = (
+        await db.execute(
+            select(Incident.status, func.count(Incident.id).label("cnt")).group_by(Incident.status)
+        )
+    ).all()
+    svc = (
+        await db.execute(
+            select(Incident.service, func.count(Incident.id).label("cnt"))
+            .where(Incident.service.isnot(None))
+            .group_by(Incident.service)
+        )
+    ).all()
+    pattern = (
+        await db.execute(
+            select(Incident.failure_pattern, func.count(Incident.id).label("cnt"))
+            .where(Incident.failure_pattern.isnot(None))
+            .group_by(Incident.failure_pattern)
+        )
+    ).all()
     return {
         "by_severity": {r.severity: r.cnt for r in sev},
         "by_status": {r.status: r.cnt for r in status},

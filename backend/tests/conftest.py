@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncGenerator
+from typing import TYPE_CHECKING
 
 import pytest
 import pytest_asyncio
@@ -13,8 +13,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.core.db import Base, get_db
 from app.main import app
 
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
 # Use an in-memory SQLite for unit tests
 TEST_DATABASE_URL = "sqlite+aiosqlite://"
+
 
 @pytest.fixture(scope="session")
 def event_loop():

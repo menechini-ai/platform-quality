@@ -75,7 +75,7 @@ export function IncidentDetailPage() {
           root_cause: rcaForm.root_cause.trim(),
           recommendations: rcaForm.recommendations
             .split("\n")
-            .map((s) => s.replace(/^\d+[\.\)]\s*/, "").trim())
+            .map((s) => s.replace(/^\d+[.)]\s*/, "").trim())
             .filter(Boolean),
         }),
       });

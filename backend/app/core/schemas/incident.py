@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-import uuid
-from datetime import datetime
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    import uuid
+    from datetime import datetime
 
 
 class IncidentCreate(BaseModel):
@@ -14,7 +17,9 @@ class IncidentCreate(BaseModel):
     status: str = Field(default="active", pattern=r"^(active|stable|resolved)$")
     severity: str = Field(default="SEV-3", pattern=r"^SEV-[1-5]$")
     service: str | None = Field(default=None, max_length=200)
-    failure_pattern: str | None = Field(default=None, pattern=r"^(deploy|resource|latency|dependency|data_corruption)$")
+    failure_pattern: str | None = Field(
+        default=None, pattern=r"^(deploy|resource|latency|dependency|data_corruption)$"
+    )
     tags: list[str] | None = None
     dd_event_id: str | None = None
     dd_monitor_id: str | None = None
@@ -26,7 +31,9 @@ class IncidentUpdate(BaseModel):
     status: str | None = Field(default=None, pattern=r"^(active|stable|resolved)$")
     severity: str | None = Field(default=None, pattern=r"^SEV-[1-5]$")
     service: str | None = Field(default=None, max_length=200)
-    failure_pattern: str | None = Field(default=None, pattern=r"^(deploy|resource|latency|dependency|data_corruption)$")
+    failure_pattern: str | None = Field(
+        default=None, pattern=r"^(deploy|resource|latency|dependency|data_corruption)$"
+    )
     tags: list[str] | None = None
     dd_event_id: str | None = None
     dd_monitor_id: str | None = None

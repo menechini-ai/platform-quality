@@ -5,13 +5,16 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 from string import Formatter
+from typing import TYPE_CHECKING
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.models.incident import Incident
 from app.core.models.rca import RcaReport
 from app.core.models.report import Report
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -147,9 +150,7 @@ async def generate_postmortem(
     if not incident:
         raise ValueError(f"Incident {incident_id} not found")
 
-    rca_result = await db.execute(
-        select(RcaReport).where(RcaReport.incident_id == uid)
-    )
+    rca_result = await db.execute(select(RcaReport).where(RcaReport.incident_id == uid))
     rca = rca_result.scalar_one_or_none()
 
     timeline = (

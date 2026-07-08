@@ -5,6 +5,7 @@ import {
   useHealthStats,
   useKnowledgeBase,
   useHealthForecast,
+  type CatalogItem,
 } from "@/api/client";
 import {
   HeartPulse,
@@ -90,7 +91,7 @@ export function HealthPage() {
   // Categorize incidents by failure pattern
   const patternIncidents = useMemo(() => {
     if (!catalog) return {};
-    const acc: Record<string, any[]> = {};
+    const acc: Record<string, CatalogItem[]> = {};
     for (const item of catalog) {
       if (item.type !== "incident") continue;
       const pat = item.failure_pattern || "uncategorized";

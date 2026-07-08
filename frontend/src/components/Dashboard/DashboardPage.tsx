@@ -1,4 +1,4 @@
-import { useIncidents, useHealthSummary, useDdMonitors, useDdSlos, useDdMetrics, type DdMetricPoint } from "@/api/client";
+import { useIncidents, useHealthSummary, useDdMonitors, useDdSlos, useDdMetrics } from "@/api/client";
 import { AlertTriangle, HeartPulse, Activity, CheckCircle2, Monitor, Sigma } from "lucide-react";
 import { Sparkline } from "@/components/ui/Sparkline";
 
@@ -30,9 +30,7 @@ function StatCard({
 
 function TrendSparklineCard({ title, metric }: { title: string; metric: string }) {
   const { data } = useDdMetrics({ metric, agg: "avg", tags: "*", days: 1 });
-  const resp = (data as Record<string, unknown>)?.resp as
-    | { series?: { metric: string; points: DdMetricPoint[] }[] }
-    | undefined;
+  const resp = data?.resp;
   const vals = resp?.series?.[0]?.points?.map((p) => p.value).filter((v) => v != null) ?? [];
 
   return (

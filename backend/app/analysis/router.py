@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import uuid
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
 from app.core.models.analysis import AnalysisResult
 from app.core.schemas.analysis import AnalysisResultRead
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 
@@ -35,8 +38,8 @@ async def get_analysis(analysis_id: str, db: AsyncSession = Depends(get_db)):
     """Get a specific analysis result."""
     try:
         uid = uuid.UUID(analysis_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid analysis ID")
+    except ValueError as err:
+        raise HTTPException(status_code=400, detail="Invalid analysis ID") from err
     result = await db.execute(select(AnalysisResult).where(AnalysisResult.id == uid))
     entry = result.scalar_one_or_none()
     if not entry:

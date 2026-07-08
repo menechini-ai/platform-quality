@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
-from httpx import AsyncClient
+
+if TYPE_CHECKING:
+    from httpx import AsyncClient
 
 
 @pytest.mark.asyncio
 async def test_metrics_endpoint(client: AsyncClient):
     """Query endpoint should return 502 (no real DD keys) but hit the router."""
-    resp = await client.get("/api/v1/datadog/metrics?metric=system.cpu.user&tags=service:api,env:prod")
+    resp = await client.get(
+        "/api/v1/datadog/metrics?metric=system.cpu.user&tags=service:api,env:prod"
+    )
     # No real DD keys = fails at SDK level with 502
     assert resp.status_code in (200, 502)
     if resp.status_code == 502:
@@ -27,7 +33,8 @@ async def test_metrics_default_tags(client: AsyncClient):
 async def test_metrics_with_scope_override(client: AsyncClient):
     """Custom scope should override tags."""
     resp = await client.get(
-        "/api/v1/datadog/metrics?metric=jvm.heap_memory&scope=service:worker AND env:staging&agg=max"
+        "/api/v1/datadog/metrics?metric=jvm.heap_memory"
+        "&scope=service:worker AND env:staging&agg=max"
     )
     assert resp.status_code in (200, 502)
 

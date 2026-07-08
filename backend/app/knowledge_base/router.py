@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import uuid
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
 from app.core.models.knowledge_base import KnowledgeBase
 from app.core.schemas.knowledge_base import KnowledgeBaseCreate, KnowledgeBaseRead
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 
@@ -35,8 +38,8 @@ async def get_kb(kb_id: str, db: AsyncSession = Depends(get_db)):
     """Get a single KB entry."""
     try:
         uid = uuid.UUID(kb_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid KB ID")
+    except ValueError as err:
+        raise HTTPException(status_code=400, detail="Invalid KB ID") from err
 
     result = await db.execute(select(KnowledgeBase).where(KnowledgeBase.id == uid))
     entry = result.scalar_one_or_none()
@@ -176,7 +179,10 @@ async def seed_knowledge_base(db: AsyncSession = Depends(get_db)):
         KnowledgeBase(
             title="RCA Pattern — Health Check Cascade Failure",
             symptom_pattern="health check OR unhealthy OR 503 OR lb OR load balancer OR OOM killed",
-            root_cause="Cascade failure: LB health check timeout → service drain → traffic surge to remaining instances",
+            root_cause=(
+                "Cascade failure: LB health check timeout → service drain "
+                "→ traffic surge to remaining instances"
+            ),
             resolution_steps=[
                 "1. Widen health check interval from 5s to 15s, increase failure threshold to 3",
                 "2. Add startup probe (180s grace) so slow-boot services aren't killed immediately",

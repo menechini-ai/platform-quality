@@ -4,11 +4,12 @@ by querying Datadog API and scoring across 8 dimensions."""
 from __future__ import annotations
 
 import logging
-from typing import Any
-
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import TYPE_CHECKING, Any
 
 from app.core.models.maturity import MaturityAssessment
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -96,9 +97,7 @@ def _score_dimension(
     return (score, issues)
 
 
-def _generate_summary(
-    level: int, score: float, scores: dict[str, float]
-) -> str:
+def _generate_summary(level: int, score: float, scores: dict[str, float]) -> str:
     """Generate human-readable summary."""
     level_name = LEVELS[level]["name"]
     top = sorted(scores.items(), key=lambda x: x[1], reverse=True)
@@ -124,13 +123,15 @@ def gap_analysis(current_level: int, target_level: int) -> list[dict[str, Any]]:
     gaps = []
     for level in range(current_level + 1, target_level + 1):
         lvl_def = LEVELS[level]
-        gaps.append({
-            "target_level": level,
-            "name": lvl_def["name"],
-            "focus": lvl_def["focus"],
-            "required_score": lvl_def["min_score"],
-            "steps": _steps_for_level(level),
-        })
+        gaps.append(
+            {
+                "target_level": level,
+                "name": lvl_def["name"],
+                "focus": lvl_def["focus"],
+                "required_score": lvl_def["min_score"],
+                "steps": _steps_for_level(level),
+            }
+        )
     return gaps
 
 
