@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useIncidents } from "@/api/client";
+import { TagFilter } from "@/components/TagFilter/TagFilter";
 import {
   AlertTriangle,
   Clock,
@@ -28,7 +29,10 @@ const severities = ["SEV-1", "SEV-2", "SEV-3", "SEV-4", "SEV-5"];
 const statuses = ["active", "stable", "resolved"];
 
 export function IncidentsPage() {
-  const { data: incidents, isLoading } = useIncidents();
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const { data: incidents, isLoading } = useIncidents(
+    tagFilter.length > 0 ? { tags: tagFilter.join(",") } : undefined
+  );
   const navigate = useNavigate();
 
   const [search, setSearch] = useState("");
@@ -43,9 +47,13 @@ export function IncidentsPage() {
         return false;
       if (sevFilter && inc.severity !== sevFilter) return false;
       if (statFilter && inc.status !== statFilter) return false;
+      if (tagFilter.length > 0) {
+        const incTags = inc.tags ?? [];
+        if (!tagFilter.some((t) => incTags.includes(t))) return false;
+      }
       return true;
     });
-  }, [incidents, search, sevFilter, statFilter]);
+  }, [incidents, search, sevFilter, statFilter, tagFilter]);
 
   const clearFilters = () => {
     setSearch("");
@@ -112,12 +120,15 @@ export function IncidentsPage() {
               {st}
             </button>
           ))}
-          {hasFilters && (
+        </div>
+        <div className="flex items-center gap-2 border-t border-slate-700/30 pt-3">
+          <TagFilter tags={tagFilter} onChange={setTagFilter} placeholder="filter by tag..." />
+          {(hasFilters || tagFilter.length > 0) && (
             <button
-              onClick={clearFilters}
-              className="text-xs text-slate-500 hover:text-slate-300 ml-2"
+              onClick={() => { clearFilters(); setTagFilter([]); }}
+              className="text-xs text-slate-500 hover:text-slate-300 ml-auto"
             >
-              Clear
+              Clear all
             </button>
           )}
         </div>

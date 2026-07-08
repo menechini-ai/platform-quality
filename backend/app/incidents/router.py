@@ -6,7 +6,8 @@ from typing import TYPE_CHECKING
 from uuid import UUID  # noqa: TC003 — needed at runtime for FastAPI path param resolution
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import String, cast, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import get_current_user
 from app.core.db import get_db
@@ -36,6 +37,10 @@ async def list_incidents(
     failure_pattern: str | None = Query(
         None, pattern=r"^(deploy|resource|latency|dependency|data_corruption)$"
     ),
+    tags: str | None = Query(
+        None,
+        description="Comma-separated tags — incidents matching ANY tag",
+    ),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
@@ -50,6 +55,11 @@ async def list_incidents(
         stmt = stmt.where(Incident.service == service)
     if failure_pattern:
         stmt = stmt.where(Incident.failure_pattern == failure_pattern)
+    if tags:
+        for tag in tags.split(","):
+            tag = tag.strip()
+            if tag:
+                stmt = stmt.where(cast(Incident.tags, String).contains(tag))
     stmt = stmt.offset(offset).limit(limit)
     result = await db.execute(stmt)
     return result.scalars().all()

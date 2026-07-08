@@ -43,7 +43,7 @@ async def list_services(
 
 @router.get("/datadog/apm/spans")
 async def list_spans(
-    query: str = "*",
+    query: str | None = Query(default=None),
     service: str | None = None,
     env: str | None = None,
     limit: int = Query(default=50, le=200),
@@ -53,7 +53,9 @@ async def list_spans(
 ):
     """Search APM traces/spans."""
     client = DatadogClient()
-    filters = [query]
+    filters: list[str] = []
+    if query:
+        filters.append(query)
     if service:
         filters.append(f"service:{service}")
     if env:
@@ -89,10 +91,10 @@ async def list_resources(
 
     now = int(datetime.now(UTC).timestamp())
 
-    service_filter = f"service:{service}" if service else "*"
+    service_filter = f"service:{service}" if service else ""
     try:
         r = client.aggregate_spans(
-            filter_query=f"env:{env} {service_filter}",
+            filter_query=f"env:{env} {service_filter}".strip() if service_filter else f"env:{env}",
             compute={"aggregation": "count"},
             group_by=[{"facet": "service"}, {"facet": "resource"}, {"facet": "operation_name"}],
             filter_from=now - 3600 * 24 * 7,

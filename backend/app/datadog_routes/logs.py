@@ -13,7 +13,7 @@ router = APIRouter()
 
 @router.get("/datadog/logs")
 async def list_logs(
-    query: str = "*",
+    query: str | None = Query(default=None),
     limit: int = Query(default=50, le=200),
     sort: str = "-timestamp",
     from_ts: int | None = None,
@@ -24,7 +24,7 @@ async def list_logs(
     client = DatadogClient()
     try:
         r = client.search_logs(
-            query,
+            query or "",
             limit=limit,
             sort=sort,
             filter_from=from_ts,
@@ -65,7 +65,7 @@ async def submit_log(
 
 @router.post("/datadog/logs/aggregate")
 async def aggregate_logs(
-    query: str = "*",
+    query: str | None = Query(default=None),
     group_by_facets: list[str] = Query(default=["service"]),
     from_ts: int | None = None,
     to_ts: int | None = None,
@@ -75,7 +75,7 @@ async def aggregate_logs(
     client = DatadogClient()
     try:
         r = client.aggregate_logs(
-            filter_query=query,
+            filter_query=query or "",
             compute={"aggregation": "count"},
             group_by=[{"facet": f} for f in group_by_facets],
             filter_from=from_ts,

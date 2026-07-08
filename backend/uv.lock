@@ -1149,6 +1149,7 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "ruff" },
+    { name = "vulture" },
 ]
 
 [package.dev-dependencies]
@@ -1188,6 +1189,7 @@ requires-dist = [
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.0,<3" },
     { name = "tenacity", specifier = ">=8.0.0,<9" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30.0,<1" },
+    { name = "vulture", marker = "extra == 'dev'", specifier = ">=2.3" },
 ]
 provides-extras = ["dev"]
 

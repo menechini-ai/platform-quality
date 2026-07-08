@@ -21,6 +21,8 @@ async def list_events(
     human: bool = Query(False, alias="human"),
 ):
     """List Datadog events with optional filters."""
+    from datetime import UTC, datetime
+
     kwargs: dict[str, object] = {}
     if start:
         kwargs["start"] = start
@@ -34,7 +36,13 @@ async def list_events(
         kwargs["tags"] = tags
 
     client = DatadogClient()
-    r = client.events.list_events(**kwargs)
+    # SDK requires start/end; default to last 24h
+    now = int(datetime.now(UTC).timestamp())
+    r = client.events.list_events(
+        start=kwargs.pop("start", now - 86400),
+        end=kwargs.pop("end", now),
+        **kwargs,
+    )
     data = r.to_dict()
     return maybe_human(data, fmt_events, human)
 

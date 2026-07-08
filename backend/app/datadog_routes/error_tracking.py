@@ -46,7 +46,7 @@ async def get_error_tracker(tracker_id: str):
 
 @router.post("/datadog/error-tracking/events")
 async def search_error_events(
-    query: str = Query("*", description="Error event query (e.g. service:api)"),
+    query: str = Query(default=None, description="Error event query (e.g. service:api)"),
     limit: int = Query(50, le=200),
     from_ts: int | None = None,
     to_ts: int | None = None,
@@ -63,8 +63,11 @@ async def search_error_events(
     from_val = from_ts or parse_time(time_range)
     to_val = to_ts or now
 
+    fil = {"from": from_val, "to": to_val}
+    if query:
+        fil["query"] = query
     body = {
-        "filter": {"query": query, "from": from_val, "to": to_val},
+        "filter": fil,
         "page": {"limit": limit},
         "sort": "-@timestamp",
     }
