@@ -41,7 +41,6 @@ celerybeat-schedule
 *.sqlite3
 
 # API demo scripts (standalone, not part of the app)
-api-demo/
 
 # Agent working directories
 .sisyphus/
