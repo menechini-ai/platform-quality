@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
 from app.core.models.maturity import MaturityAssessment
 from app.core.schemas.maturity import MaturityAssessmentRead
 from app.datadog.client import DatadogClient
 from app.maturity.service import DIMENSIONS, LEVELS, gap_analysis, run_assessment
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 
@@ -42,7 +44,9 @@ def _collect_datadog_data() -> dict[str, Any]:
 
     data["infrastructure_coverage"] = {
         "score": min(len(mons) * 10, 100),
-        "findings": [f"{len(mons)} monitors covering {host_count} service types"] if mons else ["No monitors"],
+        "findings": [f"{len(mons)} monitors covering {host_count} service types"]
+        if mons
+        else ["No monitors"],
     }
     data["tagging_standardization"] = {
         "score": tag_score,
@@ -61,7 +65,10 @@ def _collect_datadog_data() -> dict[str, Any]:
         "findings": [f"{len(incs)} incidents logged"],
     }
     data["log_management"] = {"score": 15, "findings": ["Log API configured"]}
-    data["cost_optimization"] = {"score": min(len(mons) * 5, 50), "findings": ["Inferred from infra coverage"]}
+    data["cost_optimization"] = {
+        "score": min(len(mons) * 5, 50),
+        "findings": ["Inferred from infra coverage"],
+    }
     data["automation_self_healing"] = {"score": 10, "findings": ["Self-healing not yet configured"]}
 
     dd.close()

@@ -7,13 +7,15 @@ Produces: burn-rate alerts, error budget remaining, health score.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.models.analysis import AnalysisResult
 from app.core.models.health import HealthSnapshot, Slo
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -33,31 +35,37 @@ async def analyze_health(
     slos_violated = 0
     for slo in slos:
         # Find latest health snapshot for this SLO's service
-        snap = (await db.execute(
-            select(HealthSnapshot)
-            .where(HealthSnapshot.service == slo.service)
-            .order_by(HealthSnapshot.snapshot_at.desc())
-            .limit(1)
-        )).scalar_one_or_none()
+        snap = (
+            await db.execute(
+                select(HealthSnapshot)
+                .where(HealthSnapshot.service == slo.service)
+                .order_by(HealthSnapshot.snapshot_at.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
         current = snap.current_value if snap else slo.target * 1.05  # assume healthy if no data
         if current < slo.target * 0.9:
             slos_violated += 1
-            findings.append({
-                "type": "slo_violation",
-                "slo_id": str(slo.id),
-                "name": slo.name,
-                "target": slo.target,
-                "current": current,
-            })
+            findings.append(
+                {
+                    "type": "slo_violation",
+                    "slo_id": str(slo.id),
+                    "name": slo.name,
+                    "target": slo.target,
+                    "current": current,
+                }
+            )
         elif current < slo.target:
             slos_at_risk += 1
-            findings.append({
-                "type": "slo_at_risk",
-                "slo_id": str(slo.id),
-                "name": slo.name,
-                "target": slo.target,
-                "current": current,
-            })
+            findings.append(
+                {
+                    "type": "slo_at_risk",
+                    "slo_id": str(slo.id),
+                    "name": slo.name,
+                    "target": slo.target,
+                    "current": current,
+                }
+            )
 
     if slos_violated:
         recommendations.append(f"{slos_violated} SLO(s) violated — immediate attention needed")
@@ -82,13 +90,17 @@ async def analyze_health(
             monitor_statuses.get(t, {}).get("Alert", 0) for t in monitor_statuses
         ) + sum(monitor_statuses.get(t, {}).get("Warn", 0) for t in monitor_statuses)
         if total_alerts > 5:
-            recommendations.append(f"{total_alerts} monitors in Alert/Warn state — investigate immediately")
+            recommendations.append(
+                f"{total_alerts} monitors in Alert/Warn state — investigate immediately"
+            )
 
-        findings.append({
-            "type": "datadog_monitors",
-            "summary": monitor_statuses,
-            "total_alerts": total_alerts,
-        })
+        findings.append(
+            {
+                "type": "datadog_monitors",
+                "summary": monitor_statuses,
+                "total_alerts": total_alerts,
+            }
+        )
     except Exception as e:
         findings.append({"type": "datadog_monitors", "available": False, "detail": str(e)})
 
@@ -101,7 +113,9 @@ async def analyze_health(
         healthy_count = sum(1 for s in snapshots if s.status == "healthy")
         unhealthy_count = len(snapshots) - healthy_count
         if unhealthy_count > healthy_count and len(snapshots) > 3:
-            recommendations.append("Most recent health snapshots show unhealthy status — investigate")
+            recommendations.append(
+                "Most recent health snapshots show unhealthy status — investigate"
+            )
 
     # Score
     score = 100

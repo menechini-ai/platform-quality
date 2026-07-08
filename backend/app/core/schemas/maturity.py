@@ -1,9 +1,7 @@
 """Pydantic schemas for maturity assessments."""
 
-from __future__ import annotations
-
-import uuid
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel
 
@@ -17,7 +15,7 @@ class MaturityDimension(BaseModel):
 
 
 class MaturityAssessmentRead(BaseModel):
-    id: uuid.UUID
+    id: UUID
     overall_level: int
     overall_score: float
     dimensions: dict

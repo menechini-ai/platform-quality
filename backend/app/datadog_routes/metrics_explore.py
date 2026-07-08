@@ -46,7 +46,7 @@ async def get_metric_tag_fields(metric_name: str):
         data = r.to_dict()
         tags = data.get("data", {}).get("tags", [])
         # tags format: ["env:prod", "service:api", "host:i-123"]
-        fields = sorted(set(t.split(":", 1)[0] for t in tags if ":" in t))
+        fields = sorted({t.split(":", 1)[0] for t in tags if ":" in t})
         return {"metric": metric_name, "fields": fields, "tag_count": len(tags)}
     except Exception as e:
         raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
@@ -68,7 +68,7 @@ async def get_metric_tag_values(
         data = r.to_dict()
         tags = data.get("data", {}).get("tags", [])
         prefix = f"{field_name}:"
-        values = sorted(set(t[len(prefix):] for t in tags if t.startswith(prefix)))
+        values = sorted({t[len(prefix) :] for t in tags if t.startswith(prefix)})
         return {"metric": metric_name, "field": field_name, "values": values}
     except Exception as e:
         raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e

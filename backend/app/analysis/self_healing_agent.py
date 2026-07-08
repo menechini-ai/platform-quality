@@ -7,13 +7,15 @@ Produces: runbook effectiveness, action success rate, automation gaps.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.models.analysis import AnalysisResult
 from app.core.models.self_healing import AutoHealAction, Runbook
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -35,15 +37,19 @@ async def analyze_self_healing(
         runbooks_by_service[svc] = runbooks_by_service.get(svc, 0) + 1
 
     if rb_count == 0:
-        findings.append({"type": "runbook_coverage", "severity": "critical", "detail": "No runbooks defined"})
+        findings.append(
+            {"type": "runbook_coverage", "severity": "critical", "detail": "No runbooks defined"}
+        )
         recommendations.append("Create runbooks for top incident types")
     else:
-        findings.append({
-            "type": "runbook_coverage",
-            "count": rb_count,
-            "by_service": runbooks_by_service,
-            "severity": "info",
-        })
+        findings.append(
+            {
+                "type": "runbook_coverage",
+                "count": rb_count,
+                "by_service": runbooks_by_service,
+                "severity": "info",
+            }
+        )
         recommendations.append(f"{rb_count} runbooks exist — good coverage baseline")
 
     # 2. Action effectiveness
@@ -54,13 +60,15 @@ async def analyze_self_healing(
     rejected = sum(1 for a in actions if a.status == "rejected")
     pending = sum(1 for a in actions if a.status == "pending")
 
-    findings.append({
-        "type": "action_status",
-        "total": total,
-        "approved": approved,
-        "rejected": rejected,
-        "pending": pending,
-    })
+    findings.append(
+        {
+            "type": "action_status",
+            "total": total,
+            "approved": approved,
+            "rejected": rejected,
+            "pending": pending,
+        }
+    )
     if total > 0:
         approval_rate = approved / total * 100
         if approval_rate < 50:
@@ -87,7 +95,9 @@ async def analyze_self_healing(
         pass
 
     if rb_count > 0 and not has_dd:
-        recommendations.append("Runbooks defined but no Datadog monitors connected — enable monitor triggers")
+        recommendations.append(
+            "Runbooks defined but no Datadog monitors connected — enable monitor triggers"
+        )
 
     # Score
     score = 50
@@ -102,7 +112,11 @@ async def analyze_self_healing(
         action="analyze",
         target_id=None,
         title="Self-Healing System Analysis",
-        summary=f"{rb_count} runbooks, {total} total actions ({approved} approved, {rejected} rejected, {pending} pending). Score: {score}/100.",
+        summary=(
+            f"{rb_count} runbooks, {total} total actions "
+            f"({approved} approved, {rejected} rejected, {pending} pending). "
+            f"Score: {score}/100."
+        ),
         findings=findings,
         recommendations=recommendations,
         score=score,

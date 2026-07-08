@@ -11,7 +11,9 @@ router = APIRouter()
 
 
 @router.get("/datadog/synthetics")
-async def list_synthetics(limit: int = Query(50, le=200), human: bool = Query(False, alias="human")):
+async def list_synthetics(
+    limit: int = Query(50, le=200), human: bool = Query(False, alias="human")
+):
     """List synthetic tests."""
     import httpx
 

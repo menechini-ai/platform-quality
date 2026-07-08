@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
-from httpx import AsyncClient
+
+if TYPE_CHECKING:
+    from httpx import AsyncClient
 
 
 @pytest.mark.asyncio
@@ -121,3 +125,96 @@ async def test_filter_incidents_by_severity(client: AsyncClient):
     data = response.json()
     assert len(data) == 1
     assert data[0]["severity"] == "SEV-1"
+
+
+# --- Tag filter ---
+
+
+@pytest.mark.asyncio
+async def test_filter_incidents_by_single_tag(client: AsyncClient):
+    """GET /api/v1/incidents?tags=deploy returns only matching incidents."""
+    await client.post(
+        "/api/v1/incidents",
+        json={"title": "Deploy issue", "severity": "SEV-2", "status": "active", "tags": ["deploy"]},
+    )
+    await client.post(
+        "/api/v1/incidents",
+        json={
+            "title": "DNS problem",
+            "severity": "SEV-3",
+            "status": "active",
+            "tags": ["dependency", "dns"],
+        },
+    )
+    await client.post(
+        "/api/v1/incidents",
+        json={"title": "No tag incident", "severity": "SEV-4", "status": "active"},
+    )
+
+    # Single tag
+    resp = await client.get("/api/v1/incidents?tags=deploy")
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["title"] == "Deploy issue"
+
+
+@pytest.mark.asyncio
+async def test_filter_incidents_by_multiple_tags_and(client: AsyncClient):
+    """?tags=dependency,dns returns only incidents matching ALL tags."""
+    await client.post(
+        "/api/v1/incidents",
+        json={"title": "Deploy fail", "severity": "SEV-2", "status": "active", "tags": ["deploy"]},
+    )
+    await client.post(
+        "/api/v1/incidents",
+        json={
+            "title": "DNS timeout",
+            "severity": "SEV-3",
+            "status": "active",
+            "tags": ["dependency", "dns"],
+        },
+    )
+
+    resp = await client.get("/api/v1/incidents?tags=dependency,dns")
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["title"] == "DNS timeout"
+
+
+@pytest.mark.asyncio
+async def test_filter_incidents_by_tag_no_match(client: AsyncClient):
+    """?tags=nonexistent returns empty list."""
+    await client.post(
+        "/api/v1/incidents",
+        json={"title": "Any", "severity": "SEV-2", "tags": ["deploy"]},
+    )
+    resp = await client.get("/api/v1/incidents?tags=nonexistent")
+    assert resp.json() == []
+
+
+@pytest.mark.asyncio
+async def test_filter_incidents_tag_combined_with_status(client: AsyncClient):
+    """Tags filter combines with status filter."""
+    await client.post(
+        "/api/v1/incidents",
+        json={
+            "title": "Active deploy",
+            "severity": "SEV-2",
+            "status": "active",
+            "tags": ["deploy"],
+        },
+    )
+    await client.post(
+        "/api/v1/incidents",
+        json={
+            "title": "Resolved deploy",
+            "severity": "SEV-3",
+            "status": "resolved",
+            "tags": ["deploy"],
+        },
+    )
+
+    resp = await client.get("/api/v1/incidents?tags=deploy&status=active")
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["title"] == "Active deploy"

@@ -10,16 +10,18 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.models.analysis import AnalysisResult
 from app.core.models.incident import Incident, IncidentTimeline
 from app.datadog.client import DatadogClient
 from app.datadog.write_guard import get_datadog_url, get_headers
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -77,12 +79,14 @@ async def analyze_incident(
             tags=incident.service or None,
         )
         dd_events = events.to_dict().get("events", [])
-        findings.append({
-            "type": "datadog_events",
-            "count": len(dd_events),
-            "severity": "info",
-            "detail": f"{len(dd_events)} events in window [-30m,+15m]",
-        })
+        findings.append(
+            {
+                "type": "datadog_events",
+                "count": len(dd_events),
+                "severity": "info",
+                "detail": f"{len(dd_events)} events in window [-30m,+15m]",
+            }
+        )
     except Exception as e:
         logger.warning("Datadog events query failed: %s", e)
 
@@ -95,17 +99,17 @@ async def analyze_incident(
             filter_to=sw_end,
         )
         logs_data = logs.get("data", [])
-        findings.append({
-            "type": "logs",
-            "count": len(logs_data),
-            "query": log_query,
-            "severity": "warning" if len(logs_data) > 10 else "info",
-            "detail": f"{len(logs_data)} error/warn logs in window",
-        })
+        findings.append(
+            {
+                "type": "logs",
+                "count": len(logs_data),
+                "query": log_query,
+                "severity": "warning" if len(logs_data) > 10 else "info",
+                "detail": f"{len(logs_data)} error/warn logs in window",
+            }
+        )
         if len(logs_data) > 10:
-            recommendations.append(
-                f"{len(logs_data)} error/warn logs found — review top sources"
-            )
+            recommendations.append(f"{len(logs_data)} error/warn logs found — review top sources")
     except Exception as e:
         logger.warning("Logs query failed: %s", e)
 
@@ -118,17 +122,17 @@ async def analyze_incident(
             filter_to=sw_end,
         )
         spans_data = spans.get("data", [])
-        findings.append({
-            "type": "apm_spans",
-            "count": len(spans_data),
-            "query": span_query,
-            "severity": "warning" if len(spans_data) > 10 else "info",
-            "detail": f"{len(spans_data)} error/warn APM spans in window",
-        })
+        findings.append(
+            {
+                "type": "apm_spans",
+                "count": len(spans_data),
+                "query": span_query,
+                "severity": "warning" if len(spans_data) > 10 else "info",
+                "detail": f"{len(spans_data)} error/warn APM spans in window",
+            }
+        )
         if len(spans_data) > 10:
-            recommendations.append(
-                f"{len(spans_data)} error/warn APM spans — check root span"
-            )
+            recommendations.append(f"{len(spans_data)} error/warn APM spans — check root span")
     except Exception as e:
         logger.warning("APM spans query failed: %s", e)
 
@@ -149,23 +153,27 @@ async def analyze_incident(
         )
         if et_resp.status_code == 200:
             et_data = et_resp.json().get("data", [])
-            findings.append({
-                "type": "error_tracking",
-                "count": len(et_data),
-                "severity": "warning" if len(et_data) > 0 else "info",
-                "detail": f"{len(et_data)} active error trackers in window",
-            })
+            findings.append(
+                {
+                    "type": "error_tracking",
+                    "count": len(et_data),
+                    "severity": "warning" if len(et_data) > 0 else "info",
+                    "detail": f"{len(et_data)} active error trackers in window",
+                }
+            )
             if et_data:
                 recommendations.append(
                     f"{len(et_data)} active error trackers — investigate root cause"
                 )
         else:
-            findings.append({
-                "type": "error_tracking",
-                "count": 0,
-                "severity": "info",
-                "detail": f"Error Tracking API returned {et_resp.status_code}",
-            })
+            findings.append(
+                {
+                    "type": "error_tracking",
+                    "count": 0,
+                    "severity": "info",
+                    "detail": f"Error Tracking API returned {et_resp.status_code}",
+                }
+            )
     except Exception as e:
         logger.warning("Error Tracking query failed: %s", e)
 
@@ -178,29 +186,35 @@ async def analyze_incident(
     # 7. MTTR heuristic
     if incident.resolved_at and incident.started_at:
         mttr_min = (incident.resolved_at - incident.started_at).total_seconds() / 60
-        findings.append({
-            "type": "mttr",
-            "value": round(mttr_min, 1),
-            "unit": "minutes",
-            "severity": "info",
-        })
+        findings.append(
+            {
+                "type": "mttr",
+                "value": round(mttr_min, 1),
+                "unit": "minutes",
+                "severity": "info",
+            }
+        )
         if mttr_min > 120:
             recommendations.append(
                 f"MTTR is {mttr_min:.0f} min — consider automation to reduce resolution time"
             )
     else:
-        findings.append({
-            "type": "mttr",
-            "detail": "No resolution timestamp — incident may still be active",
-        })
+        findings.append(
+            {
+                "type": "mttr",
+                "detail": "No resolution timestamp — incident may still be active",
+            }
+        )
 
     # 8. Service impact
     if incident.service:
-        findings.append({
-            "type": "service_impact",
-            "service": incident.service,
-            "severity": incident.severity,
-        })
+        findings.append(
+            {
+                "type": "service_impact",
+                "service": incident.service,
+                "severity": incident.severity,
+            }
+        )
 
     severity_parts = incident.severity.removeprefix("SEV-")
     score = max(10, 100 - int(severity_parts) * 20) if severity_parts.isdigit() else 50

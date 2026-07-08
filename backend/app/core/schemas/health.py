@@ -1,9 +1,7 @@
 """Pydantic schemas for Health / SLO."""
 
-from __future__ import annotations
-
-import uuid
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -18,7 +16,7 @@ class SloCreate(BaseModel):
 
 
 class SloRead(BaseModel):
-    id: uuid.UUID
+    id: UUID
     dd_id: str | None = None
     name: str
     description: str | None = None
@@ -31,7 +29,7 @@ class SloRead(BaseModel):
 
 
 class HealthSnapshotRead(BaseModel):
-    id: uuid.UUID
+    id: UUID
     service: str
     sli_name: str
     slo_target: float | None = None

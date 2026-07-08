@@ -8,15 +8,17 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.models.analysis import AnalysisResult
 from app.core.models.incident import Incident
 from app.core.models.knowledge_base import KnowledgeBase
 from app.core.models.rca import RcaReport
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -35,9 +37,7 @@ async def analyze_rca(
         raise ValueError(f"Incident {incident_id} not found")
 
     # Get existing RCA
-    rca_result = await db.execute(
-        select(RcaReport).where(RcaReport.incident_id == uid)
-    )
+    rca_result = await db.execute(select(RcaReport).where(RcaReport.incident_id == uid))
     rca = rca_result.scalar_one_or_none()
 
     # Match KB patterns against incident
@@ -57,16 +57,16 @@ async def analyze_rca(
             keywords = [kw.strip() for kw in kb.symptom_pattern.split(" OR ")]
             for kw in keywords:
                 if kw.lower() in title_lower or kw.lower() in desc_lower:
-                    matched_patterns.append({
-                        "kb_id": str(kb.id),
-                        "title": kb.title,
-                        "matched_keyword": kw,
-                        "root_cause": kb.root_cause,
-                        "resolution_steps": kb.resolution_steps or [],
-                    })
-                    recommendations.append(
-                        f"KB match '{kb.title}': {kb.root_cause}"
+                    matched_patterns.append(
+                        {
+                            "kb_id": str(kb.id),
+                            "title": kb.title,
+                            "matched_keyword": kw,
+                            "root_cause": kb.root_cause,
+                            "resolution_steps": kb.resolution_steps or [],
+                        }
                     )
+                    recommendations.append(f"KB match '{kb.title}': {kb.root_cause}")
                     break
 
     # Validate existing RCA completeness
@@ -86,16 +86,18 @@ async def analyze_rca(
         client = DatadogClient()
         now = int(datetime.now(UTC).timestamp())
         from_ts = now - 3600 * 24 * 7
-        metrics = client.metrics.query_metrics(
+        client.metrics.query_metrics(
             query="avg:system.cpu.user{*}",
             from_ts=from_ts,
             to=now,
         )
-        dd_findings.append({
-            "type": "datadog_metrics",
-            "available": True,
-            "detail": "CPU metrics queried for incident timeline",
-        })
+        dd_findings.append(
+            {
+                "type": "datadog_metrics",
+                "available": True,
+                "detail": "CPU metrics queried for incident timeline",
+            }
+        )
     except Exception as e:
         dd_findings.append({"type": "datadog_metrics", "available": False, "detail": str(e)})
 
@@ -114,7 +116,11 @@ async def analyze_rca(
         f"{len(matched_patterns)} KB patterns matched. "
         f"{len(recommendations)} recommendations.",
         findings=[
-            {"type": "pattern_matches", "count": len(matched_patterns), "matches": matched_patterns},
+            {
+                "type": "pattern_matches",
+                "count": len(matched_patterns),
+                "matches": matched_patterns,
+            },
             {"type": "rca_status", "exists": bool(rca), "id": str(rca.id) if rca else None},
             *dd_findings,
         ],

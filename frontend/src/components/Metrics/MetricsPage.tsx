@@ -25,9 +25,7 @@ export function MetricsPage() {
     days: 1,
   });
 
-  const series = (data as Record<string, unknown>)?.resp as
-    | { series?: { metric: string; points: DdMetricPoint[]; tag_set?: string[] }[] }
-    | undefined;
+  const series = data?.resp;
   const rows = series?.series ?? [];
 
   return (

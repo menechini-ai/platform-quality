@@ -1,9 +1,7 @@
 """Pydantic schemas for knowledge base."""
 
-from __future__ import annotations
-
-import uuid
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -17,7 +15,7 @@ class KnowledgeBaseCreate(BaseModel):
 
 
 class KnowledgeBaseRead(BaseModel):
-    id: uuid.UUID
+    id: UUID
     title: str
     symptom_pattern: str | None = None
     root_cause: str | None = None

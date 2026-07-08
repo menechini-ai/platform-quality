@@ -1,0 +1,84 @@
+repos:
+  # ─── Ruff: linter + formatter ─────────────────────────────
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.5
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ^backend/
+        types_or: [python, pyi]
+      - id: ruff-format
+        files: ^backend/
+        types_or: [python, pyi]
+
+  # ─── Pyright: static type checker ─────────────────────────
+  - repo: https://github.com/RobertCraigie/pyright-python
+    rev: v1.1.408
+    hooks:
+      - id: pyright
+        args: [--project, backend/pyrightconfig.json]
+        files: ^backend/
+        types: [python]
+
+  # ─── Gitleaks: secrets detection ──────────────────────────
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  # ─── Vulture: dead code detection (local hook) ────────────
+  - repo: local
+    hooks:
+      - id: vulture
+        name: vulture (dead code)
+        entry: bash -c 'cd backend && vulture app/ tests/ --min-confidence 65'
+        language: system
+        pass_filenames: false
+        types: [python]
+        require_serial: true
+
+  # ─── Frontend: ESLint ─────────────────────────────────────
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint (frontend)
+        entry: bash -c 'cd frontend && npx eslint .'
+        language: system
+        files: ^frontend/
+        types_or: [javascript, jsx, tsx, ts]
+        pass_filenames: false
+        require_serial: true
+
+  # ─── Frontend: TypeScript ─────────────────────────────────
+  - repo: local
+    hooks:
+      - id: tsc
+        name: typescript (frontend)
+        entry: bash -c 'cd frontend && npx tsc --noEmit'
+        language: system
+        files: ^frontend/
+        types: [ts]
+        pass_filenames: false
+        require_serial: true
+
+  # ─── Backend: pytest ──────────────────────────────────────
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest (backend)
+        entry: bash -c 'cd backend && uv run pytest -q tests/'
+        language: system
+        types: [python]
+        pass_filenames: false
+        require_serial: true
+
+  # ─── Frontend: vitest ─────────────────────────────────────
+  - repo: local
+    hooks:
+      - id: vitest
+        name: vitest (frontend)
+        entry: bash -c 'cd frontend && npx vitest run'
+        language: system
+        files: ^frontend/
+        pass_filenames: false
+        require_serial: true

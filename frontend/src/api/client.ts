@@ -61,7 +61,7 @@ export interface DdLog {
 
 export function useDdLogs(filters?: { query?: string; limit?: number }) {
   const params = new URLSearchParams();
-  params.set("query", filters?.query ?? "*");
+  if (filters?.query) params.set("query", filters.query);
   params.set("limit", String(filters?.limit ?? 50));
   params.set("sort", "-timestamp");
 
@@ -98,18 +98,19 @@ export interface DdMetricResult {
 
 export function useDdMetrics(filters: DdMetricQuery | null) {
   const params = new URLSearchParams();
-  if (!filters) return useQuery({ queryKey: ["dd-metrics", null], enabled: false });
 
-  params.set("metric", filters.metric);
-  params.set("agg", filters.agg);
-  params.set("tags", filters.tags);
-  if (filters.scope) params.set("scope", filters.scope);
-  params.set("days", String(filters.days));
+  if (filters) {
+    params.set("metric", filters.metric);
+    params.set("agg", filters.agg);
+    params.set("tags", filters.tags);
+    if (filters.scope) params.set("scope", filters.scope);
+    params.set("days", String(filters.days));
+  }
 
   return useQuery<DdMetricResult>({
     queryKey: ["dd-metrics", filters],
     queryFn: () => fetchJSON(`/datadog/metrics?${params}`),
-    enabled: !!filters.metric,
+    enabled: !!filters?.metric,
   });
 }
 
@@ -212,6 +213,7 @@ export interface Incident {
   id: string;
   dd_id?: string;
   title: string;
+  tags?: string[];
   description?: string;
   severity: string;
   status: string;
@@ -236,12 +238,16 @@ export function useIncidents(filters?: {
   status?: string;
   severity?: string;
   service?: string;
+  failure_pattern?: string;
+  tags?: string;
 }) {
   const params = new URLSearchParams();
   if (filters?.status) params.set("status", filters.status);
   if (filters?.severity) params.set("severity", filters.severity);
   if (filters?.service) params.set("service", filters.service);
-
+  if (filters?.failure_pattern) params.set("failure_pattern", filters.failure_pattern);
+  if (filters?.tags) params.set("tags", filters.tags);
+  params.set("limit", "200");
   return useQuery<Incident[]>({
     queryKey: ["incidents", filters],
     queryFn: () => fetchJSON(`/incidents?${params}`),

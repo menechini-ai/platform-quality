@@ -15,7 +15,7 @@ router = APIRouter()
 
 @router.get("/datadog/incidents")
 async def list_datadog_incidents(
-    query: str | None = Query(None, description="Search query with tags"),
+    query: str | None = Query(None, description="Search query with tags"),  # noqa: ARG001
     page_size: int = Query(10, le=200),
     page_number: int = Query(0, ge=0),
     human: bool = Query(False, alias="human"),
