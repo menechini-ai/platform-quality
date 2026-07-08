@@ -1,4 +1,6 @@
-.PHONY: install backend frontend dev db test lint safety clean
+.PHONY: install backend frontend dev db test lint safety clean \
+        db-migrate db-migrate-dev db-migration db-rollback db-rollback-dev \
+        up down build logs help
 
 # ─── Install ──────────────────────────────────────────────────────
 
@@ -23,13 +25,19 @@ dev-db:
 
 # ─── Database ─────────────────────────────────────────────────────
 
-db-migrate:
+db-migrate:          ## Apply pending migrations (via Docker one-shot)
+	docker compose run --rm migrate
+
+db-migrate-dev:      ## Apply pending migrations (local, no Docker)
 	cd backend && alembic upgrade head
 
-db-migration:
+db-migration:        ## Create new migration with MESSAGE="name"
 	cd backend && alembic revision --autogenerate -m "$(message)"
 
-db-rollback:
+db-rollback:         ## Rollback last migration
+	cd backend && alembic downgrade -1
+
+db-rollback-dev:     ## Rollback last migration (local, no Docker)
 	cd backend && alembic downgrade -1
 
 # ─── Docker ───────────────────────────────────────────────────────
@@ -93,8 +101,19 @@ help:
 	@echo "make dev-backend     - Run backend (uvicorn reload)"
 	@echo "make dev-frontend    - Run frontend (vite dev)"
 	@echo "make dev-db          - Start PostgreSQL & Redis"
+	@echo ""
+	@echo "Database:"
+	@echo "make db-migrate      - Apply migrations (Docker one-shot)"
+	@echo "make db-migrate-dev  - Apply migrations (local, no Docker)"
+	@echo "make db-migration    - Create new migration (MESSAGE=name)"
+	@echo "make db-rollback     - Rollback last migration"
+	@echo ""
+	@echo "Quality:"
 	@echo "make test            - Run all tests with coverage"
 	@echo "make lint            - Run ruff linter"
 	@echo "make typecheck       - Run mypy type checker"
 	@echo "make safety          - Run uv audit"
+	@echo ""
+	@echo "Docker:"
 	@echo "make up              - Full stack via Docker Compose"
+	@echo "make down            - Stop Docker Compose"
