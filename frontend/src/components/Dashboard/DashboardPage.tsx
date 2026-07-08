@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { useIncidents, useHealthSummary, useDdMonitors, useDdSlos, useDdMetrics } from "@/api/client";
 import { AlertTriangle, HeartPulse, Activity, CheckCircle2, Monitor, Sigma } from "lucide-react";
 import { Sparkline } from "@/components/ui/Sparkline";
+import { TagFilter } from "@/components/TagFilter/TagFilter";
 
 function StatCard({
   icon: Icon,
@@ -28,8 +30,8 @@ function StatCard({
   );
 }
 
-function TrendSparklineCard({ title, metric }: { title: string; metric: string }) {
-  const { data } = useDdMetrics({ metric, agg: "avg", tags: "*", days: 1 });
+function TrendSparklineCard({ title, metric, tags }: { title: string; metric: string; tags?: string }) {
+  const { data } = useDdMetrics({ metric, agg: "avg", tags: tags ?? "*", days: 1 });
   const resp = data?.resp;
   const vals = resp?.series?.[0]?.points?.map((p) => p.value).filter((v) => v != null) ?? [];
 
@@ -51,10 +53,13 @@ function TrendSparklineCard({ title, metric }: { title: string; metric: string }
 }
 
 export function DashboardPage() {
-  const { data: incidents } = useIncidents();
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const tagParam = tagFilter.length > 0 ? tagFilter.join(",") : undefined;
+
+  const { data: incidents } = useIncidents(tagParam ? { tags: tagParam } : undefined);
   const { data: health } = useHealthSummary();
-  const { data: monitors } = useDdMonitors();
-  const { data: slos } = useDdSlos();
+  const { data: monitors } = useDdMonitors(tagParam ? { tags: tagParam } : undefined);
+  const { data: slos } = useDdSlos(tagParam ? { tags: tagParam } : undefined);
 
   const activeIncidents = incidents?.filter((i) => i.status === "active") ?? [];
   const alertMonitors = monitors?.filter((m) => m.overall_state === "ALERT" || m.overall_state === "WARN") ?? [];
@@ -66,6 +71,11 @@ export function DashboardPage() {
       <div>
         <h1 className="text-2xl font-bold text-white">Dashboard</h1>
         <p className="text-sm text-slate-400 mt-1 font-mono">Control room overview — {new Date().toISOString().slice(11, 19)} UTC</p>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <span className="text-xs text-slate-500 uppercase tracking-wider">Filter</span>
+        <TagFilter tags={tagFilter} onChange={setTagFilter} placeholder="filter by tag..." />
       </div>
 
       {/* Stats grid — 6 cards */}
@@ -186,8 +196,8 @@ export function DashboardPage() {
 
       {/* Trends — sparklines */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <TrendSparklineCard title="CPU Trend (24h)" metric="system.cpu.user" />
-        <TrendSparklineCard title="Memory Trend (24h)" metric="system.mem.used" />
+        <TrendSparklineCard title="CPU Trend (24h)" metric="system.cpu.user" tags={tagParam} />
+        <TrendSparklineCard title="Memory Trend (24h)" metric="system.mem.used" tags={tagParam} />
       </div>
     </div>
   );

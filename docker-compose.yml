@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -80,6 +78,32 @@ services:
       - /app/node_modules
     environment:
       VITE_API_URL: http://localhost:8000/api/v1
+
+  api-demo:
+    profiles: ["demo"]  # start with: docker compose --profile demo up api-demo
+    build:
+      context: .
+      dockerfile: api-demo/Dockerfile
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://observai:observai@postgres:5432/observai
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      EMBED_MODEL: ${EMBED_MODEL:-text-embedding-3-small}
+      LITELLM_API_KEY: ${LITELLM_API_KEY:-}
+      LITELLM_BASE_URL: ${LITELLM_BASE_URL:-}
+      LITELLM_DEFAULT_MODEL: ${LITELLM_DEFAULT_MODEL:-gpt-4o}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app/backend:delegated
+      - ./api-demo:/app/api-demo:delegated
+    command: ["python", "api-demo/run.py", "--help"]
 
 volumes:
   pgdata:
