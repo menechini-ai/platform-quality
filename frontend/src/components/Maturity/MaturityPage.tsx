@@ -81,6 +81,7 @@ function useLevels() {
 }
 
 export function MaturityPage() {
+  const { data: assessments } = useAssessments();
   const { data: latest } = useLatestAssessment();
   const { data: levelsData } = useLevels();
   const [targetLevel, setTargetLevel] = useState(3);
@@ -119,7 +120,7 @@ export function MaturityPage() {
           <div className="bg-[#1e1e2e] rounded-lg border border-[#313244] p-6">
             <p className="text-sm text-gray-400 mb-1">Assessments Run</p>
             <p className="text-2xl font-semibold text-white">
-              {useAssessments().data?.length ?? 0}
+              {assessments?.length ?? 0}
             </p>
           </div>
 

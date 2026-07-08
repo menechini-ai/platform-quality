@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
-from httpx import AsyncClient
+
+if TYPE_CHECKING:
+    from httpx import AsyncClient
 
 
 @pytest.mark.asyncio
@@ -52,9 +56,7 @@ async def test_generate_postmortem_from_incident(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_postmortem_nonexistent_incident(client: AsyncClient):
-    resp = await client.post(
-        "/api/v1/reports/postmortem/00000000-0000-0000-0000-000000000000"
-    )
+    resp = await client.post("/api/v1/reports/postmortem/00000000-0000-0000-0000-000000000000")
     assert resp.status_code == 404
 
 

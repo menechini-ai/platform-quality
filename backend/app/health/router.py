@@ -2,17 +2,22 @@
 
 from __future__ import annotations
 
+from datetime import UTC
+from typing import TYPE_CHECKING
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
 from app.core.models.health import HealthSnapshot, Slo
 from app.core.models.incident import Incident
-from app.core.models.report import Report
 from app.core.models.rca import RcaReport
-from app.core.models.self_healing import Runbook, AutoHealAction
+from app.core.models.report import Report
+from app.core.models.self_healing import AutoHealAction, Runbook
 from app.core.schemas.health import HealthSnapshotRead, SloCreate, SloRead
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 
@@ -129,9 +134,9 @@ async def health_catalog(
     # Incidents — optionally filtered by recency
     inc_stmt = select(Incident)
     if days:
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
 
-        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        cutoff = datetime.now(UTC) - timedelta(days=days)
         inc_stmt = inc_stmt.where(Incident.started_at >= cutoff)
     inc_stmt = inc_stmt.order_by(Incident.created_at.desc())
     incidents = (await db.execute(inc_stmt)).scalars().all()
@@ -156,9 +161,7 @@ async def health_catalog(
         catalog.append(item)
 
     # RCAs
-    rcas = (await db.execute(
-        select(RcaReport)
-    )).scalars().all()
+    rcas = (await db.execute(select(RcaReport))).scalars().all()
     rca_by_incident = {str(r.incident_id): r for r in rcas}
     for item in catalog:
         if item["type"] == "incident":
@@ -167,9 +170,7 @@ async def health_catalog(
                 item["relationships"]["has_rca"] = str(rca.id)
 
     # Reports / Postmortems
-    reports = (await db.execute(
-        select(Report)
-    )).scalars().all()
+    reports = (await db.execute(select(Report))).scalars().all()
     for rep in reports:
         item = {
             "type": "report",
@@ -184,9 +185,7 @@ async def health_catalog(
         catalog.append(item)
 
     # Runbooks
-    runbooks = (await db.execute(
-        select(Runbook)
-    )).scalars().all()
+    runbooks = (await db.execute(select(Runbook))).scalars().all()
     for rb in runbooks:
         item = {
             "type": "runbook",
@@ -202,9 +201,7 @@ async def health_catalog(
         catalog.append(item)
 
     # Auto-heal actions
-    actions = (await db.execute(
-        select(AutoHealAction)
-    )).scalars().all()
+    actions = (await db.execute(select(AutoHealAction))).scalars().all()
     for a in actions:
         item = {
             "type": "auto_heal_action",
@@ -222,9 +219,7 @@ async def health_catalog(
         catalog.append(item)
 
     # SLOs
-    slos = (await db.execute(
-        select(Slo)
-    )).scalars().all()
+    slos = (await db.execute(select(Slo))).scalars().all()
     for s in slos:
         item = {
             "type": "slo",
@@ -264,72 +259,87 @@ async def health_stats(
         return stmt.where(time_filter) if time_filter is not None else stmt
 
     # Incident counts by service
-    inc_by_service = (await db.execute(
-        _apply_time_filter(
-            select(Incident.service, func.count(Incident.id).label("cnt"))
-            .where(Incident.service.isnot(None))
-            .group_by(Incident.service)
-            .order_by(func.count(Incident.id).desc())
+    inc_by_service = (
+        await db.execute(
+            _apply_time_filter(
+                select(Incident.service, func.count(Incident.id).label("cnt"))
+                .where(Incident.service.isnot(None))
+                .group_by(Incident.service)
+                .order_by(func.count(Incident.id).desc())
+            )
         )
-    )).all()
+    ).all()
 
     # Incident counts by failure pattern
-    inc_by_pattern = (await db.execute(
-        _apply_time_filter(
-            select(Incident.failure_pattern, func.count(Incident.id).label("cnt"))
-            .where(Incident.failure_pattern.isnot(None))
-            .group_by(Incident.failure_pattern)
-            .order_by(func.count(Incident.id).desc())
+    inc_by_pattern = (
+        await db.execute(
+            _apply_time_filter(
+                select(Incident.failure_pattern, func.count(Incident.id).label("cnt"))
+                .where(Incident.failure_pattern.isnot(None))
+                .group_by(Incident.failure_pattern)
+                .order_by(func.count(Incident.id).desc())
+            )
         )
-    )).all()
+    ).all()
 
     # Incident counts by severity
-    inc_by_severity = (await db.execute(
-        _apply_time_filter(
-            select(Incident.severity, func.count(Incident.id).label("cnt"))
-            .group_by(Incident.severity)
-            .order_by(func.count(Incident.id).desc())
+    inc_by_severity = (
+        await db.execute(
+            _apply_time_filter(
+                select(Incident.severity, func.count(Incident.id).label("cnt"))
+                .group_by(Incident.severity)
+                .order_by(func.count(Incident.id).desc())
+            )
         )
-    )).all()
+    ).all()
 
     # Incident counts by status
-    inc_by_status = (await db.execute(
-        _apply_time_filter(
-            select(Incident.status, func.count(Incident.id).label("cnt"))
-            .group_by(Incident.status)
+    inc_by_status = (
+        await db.execute(
+            _apply_time_filter(
+                select(Incident.status, func.count(Incident.id).label("cnt")).group_by(
+                    Incident.status
+                )
+            )
         )
-    )).all()
+    ).all()
 
     # Incidents without RCA (gaps)
-    no_rca = (await db.execute(
-        _apply_time_filter(
-            select(func.count(Incident.id))
-            .outerjoin(RcaReport, RcaReport.incident_id == Incident.id)
-            .where(RcaReport.id.is_(None))
+    no_rca = (
+        await db.execute(
+            _apply_time_filter(
+                select(func.count(Incident.id))
+                .outerjoin(RcaReport, RcaReport.incident_id == Incident.id)
+                .where(RcaReport.id.is_(None))
+            )
         )
-    )).scalar() or 0
+    ).scalar() or 0
 
     # Report counts by type
-    reports_by_type = (await db.execute(
-        select(Report.report_type, func.count(Report.id).label("cnt"))
-        .group_by(Report.report_type)
-    )).all()
+    reports_by_type = (
+        await db.execute(
+            select(Report.report_type, func.count(Report.id).label("cnt")).group_by(
+                Report.report_type
+            )
+        )
+    ).all()
 
     # Runbooks
-    runbook_count = (await db.execute(
-        select(func.count(Runbook.id)).where(Runbook.is_active.is_(True))
-    )).scalar() or 0
+    runbook_count = (
+        await db.execute(select(func.count(Runbook.id)).where(Runbook.is_active.is_(True)))
+    ).scalar() or 0
 
     # Auto-heal action counts by status
-    heal_by_status = (await db.execute(
-        select(AutoHealAction.status, func.count(AutoHealAction.id).label("cnt"))
-        .group_by(AutoHealAction.status)
-    )).all()
+    heal_by_status = (
+        await db.execute(
+            select(AutoHealAction.status, func.count(AutoHealAction.id).label("cnt")).group_by(
+                AutoHealAction.status
+            )
+        )
+    ).all()
 
     # SLO count
-    slo_count = (await db.execute(
-        select(func.count(Slo.id))
-    )).scalar() or 0
+    slo_count = (await db.execute(select(func.count(Slo.id)))).scalar() or 0
 
     return {
         "total_incidents": sum(r.cnt for r in inc_by_status),
@@ -362,11 +372,17 @@ async def health_forecast(
     lookback = now - timedelta(days=days)
 
     # --- Incident frequency per service ---
-    incs = (await db.execute(
-        select(Incident)
-        .where(Incident.started_at >= lookback)
-        .order_by(Incident.started_at)
-    )).scalars().all()
+    incs = (
+        (
+            await db.execute(
+                select(Incident)
+                .where(Incident.started_at >= lookback)
+                .order_by(Incident.started_at)
+            )
+        )
+        .scalars()
+        .all()
+    )
 
     by_svc: dict[str, list] = {}
     for inc in incs:
@@ -376,6 +392,7 @@ async def health_forecast(
     freq: list[dict] = []
     for svc, items in sorted(by_svc.items()):
         n = len(items)
+
         # Normalize all timestamps to naive UTC
         def _naive(dt):
             return dt.replace(tzinfo=None) if dt else dt
@@ -392,9 +409,7 @@ async def health_forecast(
         # Project next incident estimate if pattern exists
         next_estimate = None
         if mtbf_h:
-            next_estimate = (
-                items[-1].started_at + timedelta(hours=mtbf_h)
-            ).isoformat()
+            next_estimate = (items[-1].started_at + timedelta(hours=mtbf_h)).isoformat()
 
         # Group by failure pattern
         patterns: dict[str, int] = {}
@@ -402,26 +417,30 @@ async def health_forecast(
             p = i.failure_pattern or "unknown"
             patterns[p] = patterns.get(p, 0) + 1
 
-        freq.append({
-            "service": svc,
-            "total": n,
-            "mtbf_hours": mtbf_h,
-            "next_incident_estimate": next_estimate,
-            "by_pattern": patterns,
-            "last_incident": items[-1].started_at.isoformat() if items else None,
-        })
+        freq.append(
+            {
+                "service": svc,
+                "total": n,
+                "mtbf_hours": mtbf_h,
+                "next_incident_estimate": next_estimate,
+                "by_pattern": patterns,
+                "last_incident": items[-1].started_at.isoformat() if items else None,
+            }
+        )
 
     # --- SLO burn-rate projection ---
     slos = (await db.execute(select(Slo))).scalars().all()
     burn = []
     for s in slos:
         # Look up latest health snapshot for this service
-        snap = (await db.execute(
-            select(HealthSnapshot)
-            .where(HealthSnapshot.service == s.service)
-            .order_by(HealthSnapshot.snapshot_at.desc())
-            .limit(1)
-        )).scalar_one_or_none()
+        snap = (
+            await db.execute(
+                select(HealthSnapshot)
+                .where(HealthSnapshot.service == s.service)
+                .order_by(HealthSnapshot.snapshot_at.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
 
         if snap and snap.burn_rate and snap.burn_rate > 0:
             remaining = snap.error_budget_remaining or 0
@@ -429,14 +448,18 @@ async def health_forecast(
         else:
             days_to_exhaust = None
 
-        burn.append({
-            "name": s.name,
-            "service": s.service,
-            "target": s.target,
-            "burn_rate": snap.burn_rate if snap else None,
-            "error_budget_remaining_pct": round((snap.error_budget_remaining or 0) * 100, 1) if snap else None,
-            "days_to_exhaustion": days_to_exhaust,
-        })
+        burn.append(
+            {
+                "name": s.name,
+                "service": s.service,
+                "target": s.target,
+                "burn_rate": snap.burn_rate if snap else None,
+                "error_budget_remaining_pct": round((snap.error_budget_remaining or 0) * 100, 1)
+                if snap
+                else None,
+                "days_to_exhaustion": days_to_exhaust,
+            }
+        )
 
     # --- Risk scoring ---
     risk = []
@@ -459,7 +482,11 @@ async def health_forecast(
             reasons.append("multi-pattern")
         # SLO exhaustion
         for b in burn:
-            if b["service"] == svc["service"] and b["days_to_exhaustion"] and b["days_to_exhaustion"] <= 14:
+            if (
+                b["service"] == svc["service"]
+                and b["days_to_exhaustion"]
+                and b["days_to_exhaustion"] <= 14
+            ):
                 score += 2
                 reasons.append(f"SLO burn imminent ({b['days_to_exhaustion']}d)")
         # Active incidents
@@ -468,14 +495,16 @@ async def health_forecast(
             score += 1
             reasons.append(f"{active} active incidents")
 
-        risk.append({
-            "service": svc["service"],
-            "score": score,
-            "level": "high" if score >= 4 else "medium" if score >= 2 else "low",
-            "reasons": reasons,
-            "mtbf_hours": svc["mtbf_hours"],
-            "next_incident_estimate": svc["next_incident_estimate"],
-        })
+        risk.append(
+            {
+                "service": svc["service"],
+                "score": score,
+                "level": "high" if score >= 4 else "medium" if score >= 2 else "low",
+                "reasons": reasons,
+                "mtbf_hours": svc["mtbf_hours"],
+                "next_incident_estimate": svc["next_incident_estimate"],
+            }
+        )
 
     return {
         "window_days": days,

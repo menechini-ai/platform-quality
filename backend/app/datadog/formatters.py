@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import Response
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def maybe_human(
@@ -53,11 +55,11 @@ def fmt_monitors(data: list[dict[str, Any]], meta: dict[str, Any] | None = None)
         name = mon.get("name", "Unnamed")
         mid = mon.get("id", "?")
         state = mon.get("overall_state", "unknown")
-        lines.append(f"[{i+1}] [{mid}] [{state.upper()}] {name}")
+        lines.append(f"[{i + 1}] [{mid}] [{state.upper()}] {name}")
         if tags := ", ".join(mon.get("tags", [])):
             lines.append(f"     Tags: {tags}")
     if len(data) > 25:
-        lines.append(f"... +{len(data)-25} more")
+        lines.append(f"... +{len(data) - 25} more")
     return "\n".join(lines)
 
 
@@ -72,9 +74,9 @@ def fmt_logs(data: list[dict[str, Any]], meta: dict[str, Any] | None = None) -> 
         svc = attr.get("service", "?")
         host = attr.get("host", "")
         msg = str(attr.get("message", attr.get("msg", "")))[:200]
-        lines.append(f"[{i+1}] [{ts}] [{svc}] {host}: {msg}")
+        lines.append(f"[{i + 1}] [{ts}] [{svc}] {host}: {msg}")
     if len(data) > 50:
-        lines.append(f"... +{len(data)-50} more")
+        lines.append(f"... +{len(data) - 50} more")
     return "\n".join(lines)
 
 
@@ -88,9 +90,9 @@ def fmt_incidents(data: list[dict[str, Any]], meta: dict[str, Any] | None = None
         iid = inc.get("id", inc.get("incident_id", "?"))
         sev = attr.get("severity", "unknown")
         state = attr.get("state", "open")
-        lines.append(f"[{i+1}] [{iid}] [{sev}] [{state}] {title}")
+        lines.append(f"[{i + 1}] [{iid}] [{sev}] [{state}] {title}")
     if len(data) > 25:
-        lines.append(f"... +{len(data)-25} more")
+        lines.append(f"... +{len(data) - 25} more")
     return "\n".join(lines)
 
 
@@ -104,10 +106,10 @@ def fmt_metrics(data: list[dict[str, Any]], meta: dict[str, Any] | None = None) 
         metric = ser.get("metric", "?")
         scope = ser.get("scope", ser.get("tag_set", ""))
         plen = len(ser.get("pointlist", []))
-        lines.append(f"[{i+1}] {metric}")
+        lines.append(f"[{i + 1}] {metric}")
         lines.append(f"     Scope: {scope}  |  Points: {plen}")
     if len(points) > 20:
-        lines.append(f"... +{len(points)-20} more")
+        lines.append(f"... +{len(points) - 20} more")
     return "\n".join(lines)
 
 
@@ -122,12 +124,12 @@ def fmt_spans(data: list[dict[str, Any]], meta: dict[str, Any] | None = None) ->
         op = attr.get("name", attr.get("resource", "?"))
         dur = attr.get("duration", attr.get("duration_nano", 0))
         if isinstance(dur, (int, float)) and dur > 1e6:
-            dur = f"{dur/1e6:.2f}ms"
+            dur = f"{dur / 1e6:.2f}ms"
         else:
             dur = f"{dur}ns"
-        lines.append(f"[{i+1}] [{svc}] {op} ({dur})")
+        lines.append(f"[{i + 1}] [{svc}] {op} ({dur})")
     if len(data) > 25:
-        lines.append(f"... +{len(data)-25} more")
+        lines.append(f"... +{len(data) - 25} more")
     return "\n".join(lines)
 
 
@@ -140,10 +142,10 @@ def fmt_synthetics(data: list[dict[str, Any]], meta: dict[str, Any] | None = Non
         pid = test.get("public_id", test.get("id", "?"))
         status = test.get("status", "?")
         ttype = test.get("type", "?")
-        lines.append(f"[{i+1}] [{pid}] [{status}] {name}")
+        lines.append(f"[{i + 1}] [{pid}] [{status}] {name}")
         lines.append(f"     Type: {ttype}")
     if len(data) > 25:
-        lines.append(f"... +{len(data)-25} more")
+        lines.append(f"... +{len(data) - 25} more")
     return "\n".join(lines)
 
 
@@ -157,9 +159,9 @@ def fmt_fleet(data: list[dict[str, Any]], meta: dict[str, Any] | None = None) ->
         aid = agent.get("id", "?")
         status = a.get("status", "?")
         ver = a.get("agent_version", "?")
-        lines.append(f"[{i+1}] [{aid}] [{status}] {host}  v{ver}")
+        lines.append(f"[{i + 1}] [{aid}] [{status}] {host}  v{ver}")
     if len(data) > 25:
-        lines.append(f"... +{len(data)-25} more")
+        lines.append(f"... +{len(data) - 25} more")
     return "\n".join(lines)
 
 
@@ -172,9 +174,9 @@ def fmt_slos(data: list[dict[str, Any]], meta: dict[str, Any] | None = None) -> 
         name = attr.get("name", "Unnamed")
         sid = slo.get("id", "?")
         target = attr.get("target", attr.get("sli_target", "?"))
-        lines.append(f"[{i+1}] [{sid}] {name}  (target: {target})")
+        lines.append(f"[{i + 1}] [{sid}] {name}  (target: {target})")
     if len(data) > 25:
-        lines.append(f"... +{len(data)-25} more")
+        lines.append(f"... +{len(data) - 25} more")
     return "\n".join(lines)
 
 
@@ -186,8 +188,8 @@ def fmt_events(data: list[dict[str, Any]], meta: dict[str, Any] | None = None) -
         title = ev.get("title", ev.get("text", ""))
         eid = ev.get("id", "?")
         at = ev.get("alert_type", "?")
-        ts = ev.get("date_happened", ev.get("timestamp", "?"))
-        lines.append(f"[{i+1}] [{eid}] [{at}] {title}")
+        ev.get("date_happened", ev.get("timestamp", "?"))
+        lines.append(f"[{i + 1}] [{eid}] [{at}] {title}")
     if len(data) > 25:
-        lines.append(f"... +{len(data)-25} more")
+        lines.append(f"... +{len(data) - 25} more")
     return "\n".join(lines)

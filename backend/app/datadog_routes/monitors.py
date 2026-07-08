@@ -52,7 +52,9 @@ async def get_monitor(monitor_id: int):
 
 
 @router.get("/datadog/monitors/search")
-async def search_monitors(query: str = "*", page: int = 0, per_page: int = 10, human: bool = Query(False, alias="human")):
+async def search_monitors(
+    query: str = "*", page: int = 0, per_page: int = 10, human: bool = Query(False, alias="human")
+):
     """Search monitors by name/tags."""
     client = DatadogClient()
     r = client.monitors.search_monitors(query=query, page=page, per_page=per_page)
@@ -78,7 +80,7 @@ async def create_monitor(
     query: str,
     message: str = "",
     tags: list[str] | None = None,
-    priority: int | None = None,
+    priority: int | None = None,  # noqa: ARG001
 ):
     """Create a new Datadog monitor."""
     assert_write_allowed()
@@ -107,7 +109,9 @@ async def update_monitor(
     client = DatadogClient()
     from datadog_api_client.v1.model.monitor_update_request import MonitorUpdateRequest
 
-    body = MonitorUpdateRequest(name=name, query=query, message=message, tags=tags, priority=priority)
+    body = MonitorUpdateRequest(
+        name=name, query=query, message=message, tags=tags, priority=priority
+    )
     try:
         r = client.monitors.update_monitor(monitor_id=monitor_id, body=body)
         return r.to_dict()

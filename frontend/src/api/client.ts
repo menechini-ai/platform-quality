@@ -98,18 +98,19 @@ export interface DdMetricResult {
 
 export function useDdMetrics(filters: DdMetricQuery | null) {
   const params = new URLSearchParams();
-  if (!filters) return useQuery({ queryKey: ["dd-metrics", null], enabled: false });
 
-  params.set("metric", filters.metric);
-  params.set("agg", filters.agg);
-  params.set("tags", filters.tags);
-  if (filters.scope) params.set("scope", filters.scope);
-  params.set("days", String(filters.days));
+  if (filters) {
+    params.set("metric", filters.metric);
+    params.set("agg", filters.agg);
+    params.set("tags", filters.tags);
+    if (filters.scope) params.set("scope", filters.scope);
+    params.set("days", String(filters.days));
+  }
 
   return useQuery<DdMetricResult>({
     queryKey: ["dd-metrics", filters],
     queryFn: () => fetchJSON(`/datadog/metrics?${params}`),
-    enabled: !!filters.metric,
+    enabled: !!filters?.metric,
   });
 }
 

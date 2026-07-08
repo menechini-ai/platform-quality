@@ -19,6 +19,7 @@ async def search_rum_events(
     """Search RUM events (real user monitoring)."""
     client = DatadogClient()
     from datetime import UTC, datetime
+
     now = int(datetime.now(UTC).timestamp())
     from_ts = now - 3600
     try:

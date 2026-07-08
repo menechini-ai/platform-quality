@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import uuid
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
 from app.core.models.rca import RcaReport
 from app.core.schemas.rca import RcaReportCreate, RcaReportRead
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 
@@ -52,9 +55,7 @@ async def create_rca_report(
     incident_uid = data.incident_id  # already UUID from Pydantic
 
     # Check if RCA already exists for this incident
-    existing = await db.execute(
-        select(RcaReport).where(RcaReport.incident_id == incident_uid)
-    )
+    existing = await db.execute(select(RcaReport).where(RcaReport.incident_id == incident_uid))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="RCA report already exists for this incident")
 

@@ -152,8 +152,13 @@ class DatadogClient:
         return [s.to_dict() if hasattr(s, "to_dict") else s for s in data]
 
     def create_slo(
-        self, name: str, monitor_ids: list[int], target: float = 99.0,
-        warning: float | None = None, timeframe: str = "30d", tags: list[str] | None = None,
+        self,
+        name: str,
+        monitor_ids: list[int],
+        target: float = 99.0,
+        warning: float | None = None,
+        timeframe: str = "30d",
+        tags: list[str] | None = None,
     ) -> dict[str, Any] | None:
         """Create a monitor-based SLO. Warning must be > target."""
         if not self._api_client:
@@ -161,12 +166,15 @@ class DatadogClient:
         from datadog_api_client.v1.model.service_level_objective_request import (
             ServiceLevelObjectiveRequest,
         )
+
         if warning is not None and warning <= target:
             warning = target + 0.5
         body = ServiceLevelObjectiveRequest(
             type="monitor",
             name=name,
-            thresholds=[{"target": target, "timeframe": timeframe, "warning": warning or target + 0.5}],
+            thresholds=[
+                {"target": target, "timeframe": timeframe, "warning": warning or target + 0.5}
+            ],
             monitor_ids=monitor_ids,
             tags=tags or ["team:observai"],
         )
@@ -211,11 +219,9 @@ class DatadogClient:
         if body_filter["query"]:
             body["filter"] = body_filter
         if compute:
-            from datadog_api_client.v2.model.spans_aggregate_request_compute import (
-                SpansAggregateRequestCompute,
-            )
+            from datadog_api_client.v2.model.spans_compute import SpansCompute
 
-            body["compute"] = [SpansAggregateRequestCompute(**compute)]
+            body["compute"] = [SpansCompute(**compute)]
         if group_by:
             body["group_by"] = group_by
         # Pass timestamps
@@ -240,11 +246,9 @@ class DatadogClient:
         if body_filter["query"]:
             body["filter"] = body_filter
         if compute:
-            from datadog_api_client.v2.model.logs_aggregate_request_compute import (
-                LogsAggregateRequestCompute,
-            )
+            from datadog_api_client.v2.model.logs_compute import LogsCompute
 
-            body["compute"] = [LogsAggregateRequestCompute(**compute)]
+            body["compute"] = [LogsCompute(**compute)]
         if group_by:
             body["group_by"] = group_by
         for key in ("filter_from", "filter_to"):

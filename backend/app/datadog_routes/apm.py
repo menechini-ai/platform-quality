@@ -25,6 +25,7 @@ async def list_services(
     """
     client = DatadogClient()
     from datetime import datetime
+
     now = int(datetime.now(UTC).timestamp())
 
     try:
@@ -76,7 +77,7 @@ async def list_spans(
 async def list_resources(
     service: str | None = None,
     env: str = "prod",
-    limit: int = Query(default=50, le=200),
+    limit: int = Query(default=50, le=200),  # noqa: ARG001
     human: bool = Query(False, alias="human"),
 ):
     """List APM resources grouped by service.
@@ -85,6 +86,7 @@ async def list_resources(
     """
     client = DatadogClient()
     from datetime import datetime
+
     now = int(datetime.now(UTC).timestamp())
 
     service_filter = f"service:{service}" if service else "*"

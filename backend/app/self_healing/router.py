@@ -4,14 +4,17 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
 from app.core.models.self_healing import AutoHealAction, Runbook
 from app.core.schemas.self_healing import AutoHealActionRead, RunbookCreate, RunbookRead
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 
@@ -62,7 +65,9 @@ async def get_runbook(runbook_id: str, db: AsyncSession = Depends(get_db)):
 
 @router.get("/actions", response_model=list[AutoHealActionRead])
 async def list_actions(
-    status: str | None = Query(None, pattern=r"^(pending|approved|rejected|running|success|failed)$"),
+    status: str | None = Query(
+        None, pattern=r"^(pending|approved|rejected|running|success|failed)$"
+    ),
     action_type: str | None = None,
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
@@ -86,14 +91,14 @@ async def approve_action(action_id: str, db: AsyncSession = Depends(get_db)):
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid action ID") from None
 
-    result = await db.execute(
-        select(AutoHealAction).where(AutoHealAction.id == uid)
-    )
+    result = await db.execute(select(AutoHealAction).where(AutoHealAction.id == uid))
     action = result.scalar_one_or_none()
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
     if action.status != "pending":
-        raise HTTPException(status_code=400, detail=f"Action is not pending (status: {action.status})")
+        raise HTTPException(
+            status_code=400, detail=f"Action is not pending (status: {action.status})"
+        )
 
     action.status = "approved"
     action.executed_at = datetime.now(UTC)
@@ -110,14 +115,14 @@ async def reject_action(action_id: str, db: AsyncSession = Depends(get_db)):
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid action ID") from None
 
-    result = await db.execute(
-        select(AutoHealAction).where(AutoHealAction.id == uid)
-    )
+    result = await db.execute(select(AutoHealAction).where(AutoHealAction.id == uid))
     action = result.scalar_one_or_none()
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
     if action.status != "pending":
-        raise HTTPException(status_code=400, detail=f"Action is not pending (status: {action.status})")
+        raise HTTPException(
+            status_code=400, detail=f"Action is not pending (status: {action.status})"
+        )
 
     action.status = "rejected"
     action.executed_at = datetime.now(UTC)

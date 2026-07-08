@@ -21,7 +21,9 @@ class Incident(Base):
     severity = Column(String(20), nullable=False, default="SEV-3")  # SEV-1..5
     status = Column(String(30), nullable=False, default="active")  # active, stable, resolved
     service = Column(String(200), nullable=True, index=True)
-    failure_pattern = Column(String(50), nullable=True, index=True)  # deploy, resource, latency, dependency, data_corruption
+    failure_pattern = Column(
+        String(50), nullable=True, index=True
+    )  # deploy, resource, latency, dependency, data_corruption
     tags = Column(JSON, nullable=True, default=list)
     started_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
     resolved_at = Column(DateTime(timezone=True), nullable=True)
@@ -32,14 +34,18 @@ class Incident(Base):
         onupdate=lambda: datetime.now(UTC),
     )
 
-    timeline = relationship("IncidentTimeline", back_populates="incident", lazy="selectin", cascade="all, delete-orphan")
+    timeline = relationship(
+        "IncidentTimeline", back_populates="incident", lazy="selectin", cascade="all, delete-orphan"
+    )
 
 
 class IncidentTimeline(Base):
     __tablename__ = "incident_timeline"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    incident_id = Column(UUID(as_uuid=True), ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False)
+    incident_id = Column(
+        UUID(as_uuid=True), ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False
+    )
     event_type = Column(String(50), nullable=False)  # status_change, note, action, escalation
     content = Column(Text, nullable=True)
     author = Column(String(200), nullable=True)

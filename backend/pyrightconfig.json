@@ -1,0 +1,12 @@
+{
+  "venv": ".venv",
+  "venvPath": ".",
+  "include": ["app", "alembic"],
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    "**/.venv"
+  ],
+  "typeCheckingMode": "off",
+  "reportMissingImports": true
+}

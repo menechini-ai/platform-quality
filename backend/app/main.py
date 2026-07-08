@@ -50,6 +50,8 @@ def create_app() -> FastAPI:
     from app.datadog_routes.metrics_explore import router as metrics_explore_router
     from app.datadog_routes.monitors import router as monitors_router
     from app.datadog_routes.rum import router as rum_router
+    from app.datadog_routes.slos import router as slos_router
+    from app.datadog_routes.synthetics import router as synthetics_router
     from app.health.router import router as health_router
     from app.incidents.router import router as incidents_router
     from app.knowledge_base.router import router as kb_router
@@ -57,8 +59,6 @@ def create_app() -> FastAPI:
     from app.maturity.router_reports import router as reports_router
     from app.rca.router import router as rca_router
     from app.self_healing.router import router as self_healing_router
-    from app.datadog_routes.slos import router as slos_router
-    from app.datadog_routes.synthetics import router as synthetics_router
 
     prefix = settings.API_V1_PREFIX
     app.include_router(incidents_router, prefix=prefix, tags=["incidents"])
