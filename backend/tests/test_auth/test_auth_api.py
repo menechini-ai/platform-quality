@@ -48,8 +48,12 @@ async def noauth_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient,
 
 
 @pytest_asyncio.fixture
-async def authed_client(noauth_client: AsyncClient) -> AsyncClient:
+async def authed_client(noauth_client: AsyncClient, db_session: AsyncSession) -> AsyncClient:
     """Test client with DB override + valid auth token."""
+    from app.auth.service import UserService
+
+    await UserService.create_user(db_session, "admin", "admin")
+    await db_session.commit()
     resp = await noauth_client.post(
         "/api/v1/auth/login",
         json={"username": "admin", "password": "admin"},

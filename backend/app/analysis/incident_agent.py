@@ -77,7 +77,7 @@ async def analyze_incident(
         events = client.events.list_events(
             start=from_ts,
             end=to_ts,
-            tags=incident.service or None,
+            tags=incident.service or "",
         )
         dd_events = events.to_dict().get("events", [])
         findings.append(

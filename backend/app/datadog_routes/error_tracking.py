@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, HTTPException, Query
 
 from app.datadog.filters import compose_filters, period_to_range, to_domain_kwargs
@@ -75,7 +77,7 @@ async def search_error_events(
     from_val = from_ts or (rng[0] if rng else parse_time(time_range))
     to_val = to_ts or (rng[1] if rng else now)
 
-    fil = {"from": from_val, "to": to_val}
+    fil: dict[str, Any] = {"from": from_val, "to": to_val}
     tag_parts = [f"tags:{t}" for t in composed.tags] if composed.tags else []
     qparts = [p for p in [query, *tag_parts] if p]
     if qparts:

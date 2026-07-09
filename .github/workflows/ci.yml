@@ -50,11 +50,35 @@ jobs:
           . .venv/bin/activate
           uv pip install -e ".[dev]"
 
+      - name: Migrate DB (alembic upgrade head)
+        run: .venv/bin/alembic upgrade head
+        env:
+          DATABASE_URL: postgresql+asyncpg://observai:observai@localhost:5432/observai
+
       - name: Lint (ruff)
         run: .venv/bin/ruff check app/ tests/
 
       - name: Type check (pyright)
         run: .venv/bin/python -m pyright app/ alembic/
+
+      - name: Dead code (vulture)
+        run: .venv/bin/vulture app/ --min-confidence 65
+
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+
+      - name: Datadog test marker guard
+        run: |
+          fail=0
+          for f in $(grep -rilE "datadog" tests/ 2>/dev/null); do
+            if ! grep -qE "pytest.mark.datadog" "$f"; then
+              echo "MISSING @pytest.mark.datadog in $f"
+              fail=1
+            fi
+          done
+          exit $fail
 
       - name: Test (unit)
         run: .venv/bin/python -m pytest tests/ -m "not datadog" -v --cov=app --cov-report=term-missing

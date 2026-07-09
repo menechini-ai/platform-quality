@@ -76,7 +76,7 @@ lint-fix:
 	cd backend && ruff format app/ tests/
 
 typecheck:
-	cd backend && mypy app/
+	cd backend && pyright
 
 # ─── Safety ───────────────────────────────────────────────────────
 

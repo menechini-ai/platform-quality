@@ -63,7 +63,7 @@ async def query_metrics(
 
     client = DatadogClient()
     try:
-        r = client.query_metrics(query=dd_query, from_ts=from_val, to_ts=to_val)
+        r = await client.query_metrics(query=dd_query, from_ts=from_val, to_ts=to_val)
         return maybe_human(r, fmt_metrics, human, meta={"query": dd_query})
     except Exception as e:
         raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e

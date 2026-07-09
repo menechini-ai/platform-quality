@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Layout } from "@/components/Layout/Layout";
 import { DashboardPage } from "@/components/Dashboard/DashboardPage";
 import { IncidentsPage } from "@/components/Incidents/IncidentsPage";
@@ -16,12 +16,26 @@ import { ErrorTrackingPage } from "@/components/ErrorTracking/ErrorTrackingPage"
 import { SyntheticsPage } from "@/components/Synthetics/SyntheticsPage";
 import { KBSearchPage } from "@/components/KB/KBSearchPage";
 import { AgentPipelinePage } from "@/components/Agents/AgentPipelinePage";
+import { LoginPage } from "@/components/Auth/LoginPage";
+import type { ReactElement } from "react";
+import { getToken } from "@/api/client";
+
+function RequireAuth({ children }: { children: ReactElement }) {
+  return getToken() ? children : <Navigate to="/login" replace />;
+}
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route element={<Layout />}>
+        <Route path="/login" element={<LoginPage />} />
+        <Route
+          element={
+            <RequireAuth>
+              <Layout />
+            </RequireAuth>
+          }
+        >
           <Route path="/" element={<DashboardPage />} />
           <Route path="/incidents" element={<IncidentsPage />} />
           <Route path="/incidents/:id" element={<IncidentDetailPage />} />

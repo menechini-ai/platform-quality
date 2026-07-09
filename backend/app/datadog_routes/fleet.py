@@ -7,7 +7,11 @@ from fastapi import APIRouter, HTTPException, Query
 from app.datadog.filters import compose_filters, to_domain_kwargs
 from app.datadog.formatters import fmt_fleet, maybe_human
 from app.datadog.schemas import DatadogFilter, Period
-from app.datadog.write_guard import get_datadog_url, get_headers, sanitize_error_message
+from app.datadog.write_guard import (
+    friendly_datadog_error,
+    get_datadog_url,
+    get_headers,
+)
 
 router = APIRouter()
 
@@ -37,7 +41,8 @@ async def list_fleet_agents(
             data = resp.json()
             return maybe_human(data, fmt_fleet, human, meta={"total": len(data.get("data", []))})
     except Exception as e:
-        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
+        status, detail = friendly_datadog_error(e)
+        raise HTTPException(status_code=status, detail=detail) from e
 
 
 @router.get("/datadog/fleet/agents/{agent_id}")
@@ -52,4 +57,5 @@ async def get_fleet_agent_info(agent_id: str):
             resp.raise_for_status()
             return resp.json()
     except Exception as e:
-        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
+        status, detail = friendly_datadog_error(e)
+        raise HTTPException(status_code=status, detail=detail) from e

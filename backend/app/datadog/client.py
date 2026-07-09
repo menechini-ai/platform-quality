@@ -12,7 +12,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Any
+import threading
+from typing import TYPE_CHECKING, Any, Self
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -23,10 +24,20 @@ from datadog_api_client.v1.api.events_api import EventsApi
 from datadog_api_client.v1.api.metrics_api import MetricsApi
 from datadog_api_client.v1.api.monitors_api import MonitorsApi
 from datadog_api_client.v1.api.service_level_objectives_api import ServiceLevelObjectivesApi
+from datadog_api_client.v1.model.slo_threshold import SLOThreshold
+from datadog_api_client.v1.model.slo_timeframe import SLOTimeframe
+from datadog_api_client.v1.model.slo_type import SLOType
 from datadog_api_client.v2.api.incidents_api import IncidentsApi
 from datadog_api_client.v2.api.logs_api import LogsApi
 from datadog_api_client.v2.api.spans_api import SpansApi
-from tenacity import Retrying, retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import (
+    Retrying,
+    retry_any,
+    retry_if_exception,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from app.core.config import settings
 
@@ -36,20 +47,30 @@ RETRYABLE_EXCEPTIONS = (ConnectionError, TimeoutError, ApiException)
 
 
 class DatadogClient:
-    """Thread-safe singleton wrapper for the Datadog API client."""
+    """Thread-safe singleton wrapper for the Datadog API client.
 
-    _instance: DatadogClient | None = None
+    Initialised exactly once and reused across the process (FR-008). close()
+    resets the singleton so the next acquisition transparently rebuilds the
+    connection instead of reusing a closed client.
+    """
 
-    def __new__(cls, *_args: Any, **_kwargs: Any) -> DatadogClient:
+    _instance: Self | None = None
+    _lock = threading.Lock()
+
+    def __new__(cls, *_args: Any, **_kwargs: Any) -> Self:
         if cls._instance is None:
-            cls._instance = super().__new__(cls)
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
         return cls._instance
 
     def __init__(self) -> None:
-        if hasattr(self, "_initialized") and self._initialized:
+        if getattr(self, "_initialized", False):
             return
         self._initialized = True
+        self._connect()
 
+    def _connect(self) -> None:
         config = Configuration()
         config.api_key["apiKeyAuth"] = settings.DATADOG_API_KEY or ""
         config.api_key["appKeyAuth"] = settings.DATADOG_APP_KEY or ""
@@ -58,10 +79,11 @@ class DatadogClient:
         config.unstable_operations["search_incidents"] = True
 
         if not settings.DATADOG_API_KEY or not settings.DATADOG_APP_KEY:
-            logger.warning("Datadog API / APP keys not configured — client will fail on calls")
+            logger.warning(
+                "DATADOG_API_KEY / DATADOG_APP_KEY not set; client may fail to authenticate"
+            )
 
         self._api_client = ApiClient(config)
-
         self.metrics = MetricsApi(self._api_client)
         self.monitors = MonitorsApi(self._api_client)
         self.events = EventsApi(self._api_client)
@@ -70,15 +92,14 @@ class DatadogClient:
         self.logs = LogsApi(self._api_client)
         self.spans = SpansApi(self._api_client)
 
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=2, max=30),
-        retry=retry_if_exception_type(RETRYABLE_EXCEPTIONS),
-    )
-    def query_metrics(self, query: str, from_ts: int, to_ts: int) -> dict[str, Any]:
-        """Query Datadog metrics timeseries."""
-        response = self.metrics.query_metrics(query=query, from_ts=from_ts, to=to_ts)
-        return response.to_dict()
+    @classmethod
+    def get_instance(cls) -> Self:
+        """Return the shared singleton, creating it on first use."""
+        return cls()
+
+    async def query_metrics(self, query: str, from_ts: int, to_ts: int) -> dict[str, Any]:
+        """Query Datadog metrics via the shared retry/thread-offload path."""
+        return await self.call(self.metrics.query_metrics, query=query, from_ts=from_ts, to=to_ts)
 
     def list_monitors(self, **kwargs: Any) -> list[dict[str, Any]]:
         """List all Datadog monitors."""
@@ -106,7 +127,7 @@ class DatadogClient:
 
     def search_incidents(self, query: str) -> list[dict[str, Any]]:
         """Search incidents by query string."""
-        response = self.incidents.search_incidents(body={"filter": {"query": query}})
+        response = self.incidents.search_incidents(query=query)
         return [i.to_dict() for i in (response.data or [])]
 
     def search_logs(self, query: str, **kwargs: Any) -> dict[str, Any]:
@@ -174,11 +195,20 @@ class DatadogClient:
 
         if warning is not None and warning <= target:
             warning = target + 0.5
+        timeframe_map = {
+            "7d": SLOTimeframe.SEVEN_DAYS,
+            "30d": SLOTimeframe.THIRTY_DAYS,
+            "90d": SLOTimeframe.NINETY_DAYS,
+        }
         body = ServiceLevelObjectiveRequest(
-            type="monitor",
+            type=SLOType.MONITOR,
             name=name,
             thresholds=[
-                {"target": target, "timeframe": timeframe, "warning": warning or target + 0.5}
+                SLOThreshold(
+                    target=target,
+                    timeframe=timeframe_map.get(timeframe, SLOTimeframe.THIRTY_DAYS),
+                    warning=warning or target + 0.5,
+                )
             ],
             monitor_ids=monitor_ids,
             tags=tags or ["team:observai"],
@@ -229,11 +259,11 @@ class DatadogClient:
             body["compute"] = [SpansCompute(**compute)]
         if group_by:
             body["group_by"] = group_by
-        # Pass timestamps
-        for key in ("filter_from", "filter_to"):
+        # Pass timestamps (SDK uses _from/_to to avoid `from` reserved word)
+        for key, dest in (("filter_from", "_from"), ("filter_to", "_to")):
             val = kwargs.pop(key, None)
             if val is not None and "filter" in body:
-                body["filter"][key.replace("filter_", "")] = val
+                body["filter"][dest] = val
 
         request = SpansAggregateRequest(**body) if body else SpansAggregateRequest()
         response = self.spans.aggregate_spans(body=request)
@@ -256,27 +286,33 @@ class DatadogClient:
             body["compute"] = [LogsCompute(**compute)]
         if group_by:
             body["group_by"] = group_by
-        for key in ("filter_from", "filter_to"):
+        for key, dest in (("filter_from", "_from"), ("filter_to", "_to")):
             val = kwargs.pop(key, None)
             if val is not None and "filter" in body:
-                body["filter"][key.replace("filter_", "")] = val
+                body["filter"][dest] = val
 
         request = LogsAggregateRequest(**body) if body else LogsAggregateRequest()
         response = self.logs.aggregate_logs(body=request)
         return response.to_dict()
 
     def close(self) -> None:
-        """Close the underlying API client."""
-        if hasattr(self, "_api_client"):
+        """Close the underlying API client and reset the singleton.
+
+        The next DatadogClient() acquisition transparently rebuilds a fresh
+        connection, so close() never permanently breaks acquisition (FR-008).
+        """
+        if getattr(self, "_api_client", None) is not None:
             self._api_client.close()
-            DatadogClient._instance = None
+        type(self)._instance = None
 
     @staticmethod
-    def _is_retryable_api_error(exc: Exception) -> bool:
+    def _is_retryable_api_error(exc: BaseException) -> bool:
         """True if the exception is retryable (rate-limit or server error)."""
         if not isinstance(exc, ApiException):
             return False
-        return exc.status in (429,) or (exc.status and 500 <= exc.status < 600)
+        if exc.status is None:
+            return False
+        return exc.status == 429 or 500 <= exc.status < 600
 
     async def call(
         self,
@@ -299,8 +335,9 @@ async def _call_with_retry(func: Callable[..., Any], *args: Any, **kwargs: Any) 
     retryer = Retrying(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=30),
-        retry=(
-            retry_if_exception_type(RETRYABLE_EXCEPTIONS) | DatadogClient._is_retryable_api_error
+        retry=retry_any(
+            retry_if_exception_type(RETRYABLE_EXCEPTIONS),
+            retry_if_exception(DatadogClient._is_retryable_api_error),
         ),
     )
 

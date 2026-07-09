@@ -11,6 +11,9 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        # extra="forbid" is the pydantic-settings default but breaks when
+        # host env (e.g. OpenAI vars) leaks into Docker containers.
+        extra="ignore",
     )
 
     # --- App ---
@@ -23,14 +26,16 @@ class Settings(BaseSettings):
     @field_validator("SECRET_KEY")
     @classmethod
     def validate_secret_key(cls, v: str) -> str:
-        if not v or v == "change-me-in-production":
-            import os
+        import os
 
-            if os.environ.get("ENV", "").lower() in ("production", "prod"):
-                raise ValueError(
-                    "SECRET_KEY must be changed from default in production. "
-                    "Set a strong key (≥32 chars) via environment or .env"
-                )
+        env = os.environ.get("ENV", "").lower()
+        if (not v or v == "change-me-in-production") and env in ("production", "prod"):
+            raise ValueError(
+                "SECRET_KEY must be changed from default in production. "
+                "Set a strong key (≥32 chars) via environment or .env"
+            )
+        if env in ("production", "prod") and len(v) < 32:
+            raise ValueError("SECRET_KEY must be at least 32 characters in production.")
         return v
 
     # --- PostgreSQL ---
@@ -51,6 +56,12 @@ class Settings(BaseSettings):
     # --- Auth ---
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     ALGORITHM: str = "HS256"
+    JWT_ISSUER: str = "observai-platform"
+    JWT_AUDIENCE: str = "observai-platform"
+    AUTH_RATE_LIMIT: int = 5
+    AUTH_RATE_LIMIT_WINDOW_SECONDS: int = 60
+    INITIAL_ADMIN_USERNAME: str | None = None
+    INITIAL_ADMIN_PASSWORD: str | None = None
 
     # --- Self-healing ---
     SELF_HEALING_ENABLED: bool = False
