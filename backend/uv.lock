@@ -1675,6 +1675,7 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "ruff" },
+    { name = "vulture" },
 ]
 
 [package.dev-dependencies]
@@ -1723,6 +1724,7 @@ requires-dist = [
     { name = "sse-starlette", specifier = ">=2.0.0" },
     { name = "tenacity", specifier = ">=8.0.0,<9" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30.0,<1" },
+    { name = "vulture", marker = "extra == 'dev'", specifier = ">=2.16" },
 ]
 provides-extras = ["dev"]
 

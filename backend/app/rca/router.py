@@ -13,8 +13,8 @@ from app.core.models.incident import Incident
 from app.core.models.rca import RcaReport
 from app.core.schemas.incident import IncidentRead
 from app.core.schemas.rca import RcaReportCreate, RcaReportRead
-from app.llm.rca_service import generate_rca
 from app.datadog.client import DatadogClient
+from app.llm.rca_service import generate_rca
 from app.rca.engine import ConclusionState, RcaEngine
 
 if TYPE_CHECKING:

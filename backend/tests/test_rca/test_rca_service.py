@@ -11,7 +11,7 @@ from app.llm.rca_service import generate_rca
 
 
 @pytest.fixture
-def mock_db() -> AsyncMock:
+def mock_db() -> tuple[MagicMock, MagicMock]:
     """Fixture that patches get_db to yield a mock async session."""
     session = MagicMock()
     session.execute = AsyncMock()

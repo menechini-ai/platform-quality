@@ -3,7 +3,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, DateTime, String, Text, Column
+from sqlalchemy import JSON, Column, DateTime, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -30,4 +30,4 @@ class KnowledgeBase(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
-    embedding = Column(Vector(1536), nullable=True) if HAS_PGVECTOR else Column(Text, nullable=True)
+    embedding = Column(Vector(1536), nullable=True) if HAS_PGVECTOR else Column(Text, nullable=True)  # type: ignore[reportOptionalCall]

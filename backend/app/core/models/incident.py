@@ -3,7 +3,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, DateTime, ForeignKey, String, Text
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -44,7 +44,7 @@ class Incident(Base):
         onupdate=lambda: datetime.now(UTC),
     )
     llm_rca = Column(Text, nullable=True)
-    embedding = Column(Vector(1536), nullable=True) if HAS_PGVECTOR else Column(Text, nullable=True)
+    embedding = Column(Vector(1536), nullable=True) if HAS_PGVECTOR else Column(Text, nullable=True)  # type: ignore[reportOptionalCall]
 
     timeline: Mapped[list["IncidentTimeline"]] = relationship(
         "IncidentTimeline", back_populates="incident", lazy="selectin", cascade="all, delete-orphan"
