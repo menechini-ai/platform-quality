@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 
 from app.core.db import get_db
@@ -50,13 +50,17 @@ async def get_analysis(analysis_id: str, db: AsyncSession = Depends(get_db)):
 @router.post("/analysis/incident/{incident_id}", response_model=AnalysisResultRead, status_code=201)
 async def analyze_incident(
     incident_id: str,
+    tags: str | None = Query(
+        default=None,
+        description='Datadog tag filter (e.g. "service:api-gateway,env:prod")',
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     """Run incident analysis agent."""
     from app.analysis.incident_agent import analyze_incident as run
 
     try:
-        return await run(incident_id, db)
+        return await run(incident_id, db, tags=tags)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
 
@@ -64,32 +68,44 @@ async def analyze_incident(
 @router.post("/analysis/rca/{incident_id}", response_model=AnalysisResultRead, status_code=201)
 async def analyze_rca(
     incident_id: str,
+    tags: str | None = Query(
+        default=None,
+        description='Datadog tag filter (e.g. "service:api-gateway,env:prod")',
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     """Run RCA analysis agent."""
     from app.analysis.rca_agent import analyze_rca as run
 
     try:
-        return await run(incident_id, db)
+        return await run(incident_id, db, tags=tags)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 @router.post("/analysis/health", response_model=AnalysisResultRead, status_code=201)
 async def analyze_health(
+    tags: str | None = Query(
+        default=None,
+        description='Datadog tag filter (e.g. "service:api-gateway,env:prod")',
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     """Run product health analysis agent."""
     from app.analysis.health_agent import analyze_health as run
 
-    return await run(db)
+    return await run(db, tags=tags)
 
 
 @router.post("/analysis/self-healing", response_model=AnalysisResultRead, status_code=201)
 async def analyze_self_healing(
+    tags: str | None = Query(
+        default=None,
+        description='Datadog tag filter (e.g. "service:api-gateway,env:prod")',
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     """Run self-healing analysis agent."""
     from app.analysis.self_healing_agent import analyze_self_healing as run
 
-    return await run(db)
+    return await run(db, tags=tags)

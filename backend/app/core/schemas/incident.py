@@ -65,6 +65,7 @@ class IncidentRead(BaseModel):
     dd_monitor_id: str | None = None
     started_at: datetime | None = None
     timeline: list[TimelineEventRead] = []
+    llm_rca: str | None = None
     created_at: datetime
     updated_at: datetime | None = None
     resolved_at: datetime | None = None

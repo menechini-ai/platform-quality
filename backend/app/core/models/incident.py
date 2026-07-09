@@ -7,6 +7,14 @@ from sqlalchemy import JSON, Column, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
+try:
+    from pgvector.sqlalchemy import Vector
+
+    HAS_PGVECTOR = True
+except ImportError:
+    HAS_PGVECTOR = False
+    Vector = None  # type: ignore[assignment, misc]
+
 from app.core.db import Base
 
 
@@ -33,6 +41,8 @@ class Incident(Base):
         default=lambda: datetime.now(UTC),
         onupdate=lambda: datetime.now(UTC),
     )
+    llm_rca = Column(Text, nullable=True)
+    embedding = Column(Vector(1536), nullable=True) if HAS_PGVECTOR else Column(Text, nullable=True)
 
     timeline = relationship(
         "IncidentTimeline", back_populates="incident", lazy="selectin", cascade="all, delete-orphan"

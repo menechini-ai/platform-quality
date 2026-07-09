@@ -9,8 +9,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 
 from app.core.db import get_db
+from app.core.models.incident import Incident
 from app.core.models.rca import RcaReport
+from app.core.schemas.incident import IncidentRead
 from app.core.schemas.rca import RcaReportCreate, RcaReportRead
+from app.llm.rca_service import generate_rca
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -69,3 +72,29 @@ async def create_rca_report(
     await db.flush()
     await db.refresh(report)
     return report
+
+
+@router.post("/rca/{incident_id}/generate", response_model=IncidentRead)
+async def generate_llm_rca(incident_id: str, db: AsyncSession = Depends(get_db)):
+    """Generate an LLM-powered RCA for an incident.
+
+    Calls the LiteLLM client with incident context and stores the result
+    in the incident's ``llm_rca`` field.
+    """
+    try:
+        uid = uuid.UUID(incident_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid incident ID") from None
+
+    result = await db.execute(select(Incident).where(Incident.id == uid))
+    incident = result.scalar_one_or_none()
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    try:
+        await generate_rca(uid)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Incident not found") from None
+
+    await db.refresh(incident)
+    return incident

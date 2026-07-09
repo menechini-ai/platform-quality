@@ -6,6 +6,14 @@ from datetime import UTC, datetime
 from sqlalchemy import JSON, Column, DateTime, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 
+try:
+    from pgvector.sqlalchemy import Vector
+
+    HAS_PGVECTOR = True
+except ImportError:
+    HAS_PGVECTOR = False
+    Vector = None  # type: ignore[assignment, misc]
+
 from app.core.db import Base
 
 
@@ -19,3 +27,4 @@ class KnowledgeBase(Base):
     resolution_steps = Column(JSON, nullable=True)
     tags = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    embedding = Column(Vector(1536), nullable=True) if HAS_PGVECTOR else Column(Text, nullable=True)

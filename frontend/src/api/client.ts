@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 const API_BASE = "/api/v1";
 
@@ -59,15 +59,17 @@ export interface DdLog {
   status?: string;
 }
 
-export function useDdLogs(filters?: { query?: string; limit?: number }) {
+export function useDdLogs(filters?: { query?: string; limit?: number; tags?: string }) {
   const params = new URLSearchParams();
   if (filters?.query) params.set("query", filters.query);
+  if (filters?.tags) params.set("tags", filters.tags);
   params.set("limit", String(filters?.limit ?? 50));
   params.set("sort", "-timestamp");
 
   return useQuery<DdLog[]>({
     queryKey: ["dd-logs", filters],
     queryFn: () => fetchJSON(`/datadog/logs?${params}`),
+    enabled: !!(filters?.query || filters?.tags),
     refetchInterval: 30_000,
   });
 }
@@ -196,9 +198,10 @@ export interface SyntheticTest {
   locations?: string[];
 }
 
-export function useSynthetics(filters?: { limit?: number }) {
+export function useSynthetics(filters?: { limit?: number; tags?: string }) {
   const params = new URLSearchParams();
   params.set("limit", String(filters?.limit ?? 50));
+  if (filters?.tags) params.set("tags", filters.tags);
 
   return useQuery<SyntheticTest[]>({
     queryKey: ["synthetics", filters],
@@ -365,6 +368,35 @@ export function useActions(filters?: { status?: string }) {
   return useQuery<AutoHealAction[]>({
     queryKey: ["actions", filters],
     queryFn: () => fetchJSON(`/actions?${params}`),
+  });
+}
+
+export function useApproveAction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (actionId: string) =>
+      fetchJSON<AutoHealAction>(`/actions/${actionId}/approve`, { method: "POST" }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["actions"] }); },
+  });
+}
+
+export function useRejectAction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (actionId: string) =>
+      fetchJSON<AutoHealAction>(`/actions/${actionId}/reject`, { method: "POST" }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["actions"] }); },
+  });
+}
+
+export function useAnalyzeSelfHealing() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (tags?: string) => {
+      const params = tags ? `?tags=${encodeURIComponent(tags)}` : "";
+      return fetchJSON<AnalysisResult>(`/analysis/self-healing${params}`, { method: "POST" });
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["analysis"] }); },
   });
 }
 

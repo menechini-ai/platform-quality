@@ -19,8 +19,11 @@ if TYPE_CHECKING:
 router = APIRouter()
 
 
-def _collect_datadog_data() -> dict[str, Any]:
-    """Query Datadog APIs and score each maturity dimension (0-100)."""
+def _collect_datadog_data(tags: str | None = None) -> dict[str, Any]:
+    """Query Datadog APIs and score each maturity dimension (0-100).
+    Args:
+        tags: Optional tag filter (e.g. ``"service:api-gateway,env:prod"``).
+    """
     try:
         dd = DatadogClient()
     except Exception:
@@ -29,14 +32,14 @@ def _collect_datadog_data() -> dict[str, Any]:
     data: dict[str, Any] = {}
 
     try:
-        mons = dd.list_monitors()
+        mons = dd.list_monitors(tags=tags) if tags else dd.list_monitors()
         host_count = len({m.get("query", "").split("{")[0] for m in mons if m.get("query")})
         tag_score = 0
         if mons:
             tagged = sum(1 for m in mons if m.get("tags"))
             tag_score = round(tagged / len(mons) * 100, 1)
         alert_count = sum(1 for m in mons if m.get("overall_state") in ("alert", "warn"))
-        slos = dd.list_slos()
+        slos = dd.list_slos(tags_query=tags) if tags else dd.list_slos()
         incs = dd.list_incidents()
     except Exception as e:
         dd.close()
@@ -102,9 +105,13 @@ async def latest_assessment(
 
 @router.post("/maturity/assess", response_model=MaturityAssessmentRead, status_code=201)
 async def assess_maturity(
+    tags: str | None = Query(
+        default=None,
+        description='Datadog tag filter (e.g. "service:api-gateway,env:prod")',
+    ),
     db: AsyncSession = Depends(get_db),
 ):
-    dd_data = _collect_datadog_data()
+    dd_data = _collect_datadog_data(tags=tags)
     assessment = await run_assessment(db, datadog_data=dd_data)
     return assessment
 

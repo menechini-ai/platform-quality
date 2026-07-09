@@ -14,6 +14,8 @@ import { MetricsPage } from "@/components/Metrics/MetricsPage";
 import { SlosPage } from "@/components/Slos/SlosPage";
 import { ErrorTrackingPage } from "@/components/ErrorTracking/ErrorTrackingPage";
 import { SyntheticsPage } from "@/components/Synthetics/SyntheticsPage";
+import { KBSearchPage } from "@/components/KB/KBSearchPage";
+import { AgentPipelinePage } from "@/components/Agents/AgentPipelinePage";
 
 export default function App() {
   return (
@@ -34,6 +36,8 @@ export default function App() {
           <Route path="/self-healing" element={<SelfHealingPage />} />
           <Route path="/maturity" element={<MaturityPage />} />
           <Route path="/reports" element={<ReportsPage />} />
+          <Route path="/kb" element={<KBSearchPage />} />
+          <Route path="/agents" element={<AgentPipelinePage />} />
         </Route>
       </Routes>
     </BrowserRouter>

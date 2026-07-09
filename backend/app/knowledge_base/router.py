@@ -5,12 +5,13 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 
 from app.core.db import get_db
 from app.core.models.knowledge_base import KnowledgeBase
 from app.core.schemas.knowledge_base import KnowledgeBaseCreate, KnowledgeBaseRead
+from app.llm.kb_service import search_kb
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,6 +32,16 @@ async def list_kb(
         query = query.where(KnowledgeBase.tags.contains([tag]))
     result = await db.execute(query.offset(offset).limit(limit))
     return result.scalars().all()
+
+
+@router.get("/kb/search")
+async def search_kb_endpoint(
+    q: str = Query(..., min_length=1, description="Natural language search query"),
+    k: int = Query(3, ge=1, le=20, description="Number of results"),
+):
+    """Semantically search the knowledge base using embedding similarity."""
+    results = await search_kb(q, k=k)
+    return {"results": results, "query": q, "count": len(results)}
 
 
 @router.get("/kb/{kb_id}", response_model=KnowledgeBaseRead)
