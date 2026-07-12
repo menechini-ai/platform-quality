@@ -167,3 +167,31 @@ async def get_incident_with_embedding(
         if incident and incident.embedding:
             return incident, incident.embedding
     return None
+
+
+async def get_similar_incidents_context(
+    query: str,
+    limit: int = 3,
+) -> str:
+    """Get formatted similar incidents context for ReAct prompt."""
+    similar = await search_similar_incidents(
+        query_text=query,
+        limit=limit,
+        threshold=settings.SIMILARITY_THRESHOLD,
+    )
+
+    if not similar:
+        return "No similar historical incidents found."
+
+    lines = ["Similar historical incidents:"]
+    for embedding, score in similar:
+        incident = embedding.incident
+        lines.append(
+            f"  - {incident.title} (service: {incident.service}, "
+            f"pattern: {incident.failure_pattern}, similarity: {score:.2f})"
+        )
+        if incident.description:
+            lines.append(f"    Description: {incident.description[:200]}...")
+        if embedding.source_text:
+            lines.append(f"    Context: {embedding.source_text[:200]}...")
+    return "\n".join(lines)

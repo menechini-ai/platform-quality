@@ -11,6 +11,7 @@ from app.datadog.client import DatadogClient
 from app.datadog_kit.collector import fetch_all
 from app.datadog_kit.config import DatadogKitConfig
 from app.datadog_kit.diagnosis import _call_openai, _parse_rca_response
+from app.datadog_kit.embeddings import get_similar_incidents_context
 from app.datadog_kit.models import (
     InvestigationRequest,
     InvestigationRequestV3,
@@ -285,11 +286,19 @@ async def investigate_react(request: InvestigationRequestV3) -> InvestigationRes
     )
     context = await fetch_all(base_request, config)
 
+    # Add similar incidents context
+    similar_context = await get_similar_incidents_context(
+        query=request.query,
+        limit=settings.MAX_SIMILAR_INCIDENTS,
+    )
+
     trace: list[ReActTurn] = []
 
     for _turn in range(1, request.max_turns + 1):
         context_summary = _build_context_summary(context)
         msg = f"Investigation: {request.query}\nData:\n{context_summary}"
+        if similar_context:
+            msg += f"\n\nSimilar Historical Incidents:\n{similar_context}"
         messages = [
             {"role": "system", "content": _REACT_SYSTEM_PROMPT},
             {"role": "user", "content": msg},
