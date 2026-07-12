@@ -81,5 +81,14 @@ class Settings(BaseSettings):
     PAGERDUTY_INTEGRATION_KEY: str | None = None
     PAGERDUTY_API_URL: str = "https://events.pagerduty.com/v2/enqueue"
 
+    # --- Feature Flags / Canary ---
+    ENABLE_VECTOR_SEARCH: bool = True
+    ENABLE_REACT_AGENT: bool = True
+    ENABLE_PLAYBOOK_EXECUTOR: bool = True
+    ENABLE_NOTIFICATIONS: bool = True
+    ENABLE_FEEDBACK_API: bool = True
+    CANARY_PERCENTAGE: int = 10
+    CANARY_ENABLED: bool = False
+
 
 settings = Settings()
