@@ -23,6 +23,14 @@ from app.datadog_kit.playbook_executor import (
     StepType,
     build_playbook_from_runbook,
 )
+from app.datadog_kit.notifications import (
+    NotificationChannel,
+    NotificationDispatcher,
+    NotificationPayload,
+    NotificationPriority,
+    build_incident_notification,
+    build_playbook_notification,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -252,6 +260,104 @@ async def execute_playbook_steps(
             }
             for s in execution.steps
         ],
+    }
+
+
+@router.post("/notifications/send")
+async def send_notification(
+    payload: NotificationPayload,
+    channels: list[NotificationChannel] | None = None,
+):
+    """Send notification to configured channels.
+
+    Body: NotificationPayload
+    Query: channels=[slack,telegram,pagerduty] (optional, defaults to all configured)
+    """
+    dispatcher = NotificationDispatcher()
+    results = await dispatcher.send(payload, channels)
+    return {
+        "results": [
+            {
+                "channel": r.channel.value,
+                "success": r.success,
+                "external_id": r.external_id,
+                "message": r.message,
+                "error": r.error,
+            }
+            for r in results
+        ]
+    }
+
+
+@router.post("/notifications/incident")
+async def notify_incident(
+    request: dict,
+    channels: list[NotificationChannel] | None = None,
+):
+    """Build and send incident notification from investigation result.
+
+    Body: {
+        "incident_title": "...",
+        "diagnosis": {...},  # RcaDiagnosis dict
+        "incident_id": "...",
+        "runbook_url": "...",
+        "investigation_url": "..."
+    }
+    """
+    dispatcher = NotificationDispatcher()
+    notification = build_incident_notification(
+        incident_title=request["incident_title"],
+        diagnosis=request["diagnosis"],
+        incident_id=request.get("incident_id"),
+        runbook_url=request.get("runbook_url"),
+        investigation_url=request.get("investigation_url"),
+    )
+    results = await dispatcher.send(notification, channels)
+    return {
+        "results": [
+            {
+                "channel": r.channel.value,
+                "success": r.success,
+                "external_id": r.external_id,
+                "message": r.message,
+                "error": r.error,
+            }
+            for r in results
+        ]
+    }
+
+
+@router.post("/notifications/playbook")
+async def notify_playbook(
+    request: dict,
+    channels: list[NotificationChannel] | None = None,
+):
+    """Build and send playbook execution notification.
+
+    Body: {
+        "playbook_title": "...",
+        "execution": {...},  # PlaybookExecution dict
+        "investigation_url": "..."
+    }
+    """
+    dispatcher = NotificationDispatcher()
+    notification = build_playbook_notification(
+        playbook_title=request["playbook_title"],
+        execution=request["execution"],
+        investigation_url=request.get("investigation_url"),
+    )
+    results = await dispatcher.send(notification, channels)
+    return {
+        "results": [
+            {
+                "channel": r.channel.value,
+                "success": r.success,
+                "external_id": r.external_id,
+                "message": r.message,
+                "error": r.error,
+            }
+            for r in results
+        ]
     }
 
 

@@ -72,5 +72,14 @@ class Settings(BaseSettings):
     SELF_HEALING_MAX_PARALLEL_STEPS: int = 1
     PLAYBOOK_DEFAULT_TIMEOUT_SECONDS: int = 300
 
+    # --- Notifications ---
+    SLACK_WEBHOOK_URL: str | None = None
+    SLACK_BOT_TOKEN: str | None = None
+    SLACK_DEFAULT_CHANNEL: str = "#alerts"
+    TELEGRAM_BOT_TOKEN: str | None = None
+    TELEGRAM_CHAT_ID: str | None = None
+    PAGERDUTY_INTEGRATION_KEY: str | None = None
+    PAGERDUTY_API_URL: str = "https://events.pagerduty.com/v2/enqueue"
+
 
 settings = Settings()
