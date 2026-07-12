@@ -12,10 +12,11 @@ from app.core.db import get_db
 from app.core.models.rca import RcaReport
 from app.core.schemas.rca import RcaReportRead
 from app.datadog.client import DatadogClient
+from app.datadog_kit.agent import investigate_react
 from app.datadog_kit.collector import fetch_all
 from app.datadog_kit.config import DatadogKitConfig
 from app.datadog_kit.diagnosis import analyze
-from app.datadog_kit.models import InvestigationRequest  # noqa: TC001
+from app.datadog_kit.models import InvestigationRequest, InvestigationRequestV3  # noqa: TC001
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -92,6 +93,79 @@ async def investigate(
         request.query,
         diagnosis.confidence,
         investigation.total_duration_ms,
+    )
+
+    return report
+
+
+@router.post("/investigate/v3", response_model=RcaReportRead)
+async def investigate_v3(
+    request: InvestigationRequestV3,
+    db: AsyncSession = Depends(get_db),
+) -> RcaReport:
+    """Run ReAct investigation loop: iterative tool use + LLM reasoning.
+    Returns enhanced RCA with react_trace, runbook, and MTTR breakdown.
+    """
+    # Use new ReAct agent
+    result = await investigate_react(request)
+
+    # Step: Link Datadog incident if provided
+    incident_id = request.incident_id
+    if incident_id:
+        client = DatadogClient()
+        try:
+            incident_data = await client.call(client.get_incident, incident_id=incident_id)
+            logger.info("Linked incident %s: %s", incident_id, incident_data.get("title", ""))
+        except Exception as exc:
+            logger.warning("Failed to fetch incident %s: %s", incident_id, exc)
+
+    # Build error logs snapshot
+    error_logs = [
+        entry.model_dump()
+        for entry in result.logs.logs
+        if entry.status.lower() in ("error", "critical", "fatal")
+    ]
+
+    # Save to DB with V3 enhancements
+    report = RcaReport(
+        incident_id=incident_id,
+        summary=f"ReAct Investigation for: {request.query}",
+        root_cause=result.diagnosis.root_cause if result.diagnosis else "Unknown",
+        recommendations=result.diagnosis.remediation_steps if result.diagnosis else [],
+        timeline={
+            "causal_chain": result.diagnosis.causal_chain if result.diagnosis else [],
+            "severity": result.diagnosis.severity if result.diagnosis else "P3",
+            "confidence": result.diagnosis.confidence if result.diagnosis else 0.0,
+            "inconclusive": result.diagnosis.inconclusive if result.diagnosis else True,
+            "category": result.diagnosis.root_cause_category if result.diagnosis else "dependency",
+            "react_trace": [
+                t.model_dump() for t in result.react_trace
+            ] if result.react_trace else [],
+            "runbook": result.runbook.model_dump() if result.runbook else None,
+            "mttr_breakdown": (
+                result.mttr_breakdown.model_dump() if result.mttr_breakdown else None
+            ),
+        },
+        metrics_snapshot={
+            "series": [s.model_dump() for s in result.metrics.series],
+            "total_duration_ms": result.total_duration_ms,
+        },
+        logs_snapshot={
+            "total": result.logs.total,
+            "errors": error_logs[:20],
+            "query": result.query,
+        },
+        changes=result.diagnosis.evidence_refs if result.diagnosis else {},
+    )
+    db.add(report)
+    await db.flush()
+    await db.refresh(report)
+
+    logger.info(
+        "ReAct investigation complete: query=%s turns=%d duration=%dms",
+        request.query,
+        len(result.react_trace),
+        result.total_duration_ms,
     )
 
     return report
