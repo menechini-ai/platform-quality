@@ -3,7 +3,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -43,11 +43,24 @@ class Incident(Base):
         default=lambda: datetime.now(UTC),
         onupdate=lambda: datetime.now(UTC),
     )
-    llm_rca = Column(Text, nullable=True)
-    embedding = Column(Vector(1536), nullable=True) if HAS_PGVECTOR else Column(Text, nullable=True)  # type: ignore[reportOptionalCall]
+    llm_rca: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Resolution tracking fields (V4)
+    resolution_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    resolution_outcome: Mapped[str | None] = mapped_column(
+        String(50), nullable=True
+    )  # auto, manual, partial
+    resolution_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    resolved_by: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    resolved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    environment: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     timeline: Mapped[list["IncidentTimeline"]] = relationship(
         "IncidentTimeline", back_populates="incident", lazy="selectin", cascade="all, delete-orphan"
+    )
+
+    embedding = relationship(
+        "IncidentEmbedding", back_populates="incident", uselist=False, cascade="all, delete-orphan"
     )
 
 

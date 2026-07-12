@@ -11,8 +11,6 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
-        # extra="forbid" is the pydantic-settings default but breaks when
-        # host env (e.g. OpenAI vars) leaks into Docker containers.
         extra="ignore",
     )
 
@@ -39,7 +37,7 @@ class Settings(BaseSettings):
         return v
 
     # --- PostgreSQL ---
-    DATABASE_URL: str = "postgresql+asyncpg://observai:observai@localhost:5432/observai"
+    DATABASE_URL: str = "sqlite+aiosqlite:///./observai.db"
 
     # --- Redis (cache + celery broker) ---
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -52,6 +50,11 @@ class Settings(BaseSettings):
     # --- Datadog global filter (applied to every datadog_routes/* call) ---
     DATADOG_DEFAULT_TAGS: list[str] = []
     DATADOG_DEFAULT_PERIOD: Literal["1d", "7d", "15d", "30d"] | None = None
+
+    # --- LLM ---
+    OPENAI_API_KEY: str | None = None
+    OPENAI_BASE_URL: str = "https://api.openai.com/v1"
+    LLM_MODEL: str = "gpt-4o-mini"
 
     # --- Auth ---
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
@@ -71,9 +74,38 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = "redis://localhost:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"
 
+    # --- Vector DB (pgvector) ---
+    VECTOR_DB_URL: str = "postgresql+asyncpg://postgres:***@localhost:5432/vectordb"
+    EMBEDDING_MODEL: str = "text-embedding-3-small"
+    EMBEDDING_DIM: int = 1536
+    SIMILARITY_THRESHOLD: float = 0.75
+    MAX_SIMILAR_INCIDENTS: int = 5
+
+    # --- Self-healing / Playbook Executor ---
+    SELF_HEALING_APPROVAL_REQUIRED: bool = True
+    SELF_HEALING_DRY_RUN_DEFAULT: bool = False
+    SELF_HEALING_MAX_PARALLEL_STEPS: int = 1
+    PLAYBOOK_DEFAULT_TIMEOUT_SECONDS: int = 300
+
+    # --- Notifications ---
+    SLACK_WEBHOOK_URL: str | None = None
+    SLACK_BOT_TOKEN: str | None = None
+    SLACK_DEFAULT_CHANNEL: str = "#alerts"
+    TELEGRAM_BOT_TOKEN: str | None = None
+    TELEGRAM_CHAT_ID: str | None = None
+    PAGERDUTY_INTEGRATION_KEY: str | None = None
+    PAGERDUTY_API_URL: str = "https://events.pagerduty.com/v2/enqueue"
+
+    # --- Feature Flags / Canary ---
+    ENABLE_VECTOR_SEARCH: bool = True
+    ENABLE_REACT_AGENT: bool = True
+    ENABLE_PLAYBOOK_EXECUTOR: bool = True
+    ENABLE_NOTIFICATIONS: bool = True
+    ENABLE_FEEDBACK_API: bool = True
+    CANARY_PERCENTAGE: int = 10
+    CANARY_ENABLED: bool = False
+
     # --- LLM / AI ---
-    OPENAI_API_KEY: str | None = None
-    OPENAI_BASE_URL: str | None = None
     EMBED_MODEL: str = "text-embedding-3-small"
     LITELLM_API_KEY: str | None = None
     LITELLM_BASE_URL: str | None = None

@@ -81,8 +81,14 @@ class TestLogin:
         assert len(body["access_token"]) > 20
 
     @pytest.mark.asyncio
-    async def test_login_invalid_password(self, raw_client: AsyncClient):
-        resp = await raw_client.post(
+    async def test_login_invalid_password(
+        self, noauth_client: AsyncClient, db_session: AsyncSession
+    ):
+        from app.auth.service import UserService
+
+        await UserService.create_user(db_session, "admin", "admin")
+        await db_session.commit()
+        resp = await noauth_client.post(
             "/api/v1/auth/login",
             json={"username": "admin", "password": "wrong"},
         )
@@ -90,8 +96,8 @@ class TestLogin:
         assert resp.json()["detail"] == "Invalid credentials"
 
     @pytest.mark.asyncio
-    async def test_login_invalid_username(self, raw_client: AsyncClient):
-        resp = await raw_client.post(
+    async def test_login_invalid_username(self, noauth_client: AsyncClient):
+        resp = await noauth_client.post(
             "/api/v1/auth/login",
             json={"username": "nobody", "password": "admin"},
         )

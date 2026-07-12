@@ -14,6 +14,7 @@ dependencies = [
     "pydantic-settings>=2.0.0,<3",
     "datadog-api-client>=2.0.0,<3",
     "httpx>=0.27.0,<1",
+    "pgvector>=0.2.0,<1",
     "python-jose[cryptography]>=3.3.0,<4",
     "passlib[bcrypt]>=1.7.4,<2",
     "bcrypt>=4.0.1,<4.1",  # pin bcrypt <4.1: 4.1.0 removed __about__, which passlib 1.7.4 reads at import
@@ -63,6 +64,7 @@ build-backend = "setuptools.build_meta"
 
 [dependency-groups]
 dev = [
+    "aiosqlite>=0.22.1",
     "pyright>=1.1.411",
     "vulture>=2.16",
 ]

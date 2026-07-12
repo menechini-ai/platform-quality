@@ -17,7 +17,7 @@ class RcaReportCreate(BaseModel):
 
 class RcaReportRead(BaseModel):
     id: UUID
-    incident_id: UUID
+    incident_id: UUID | None = None
     summary: str | None = None
     root_cause: str | None = None
     confidence: float = 0.0
