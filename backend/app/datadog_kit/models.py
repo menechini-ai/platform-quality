@@ -1,5 +1,4 @@
 """Pydantic models for the Datadog investigation kit."""
-
 from __future__ import annotations
 
 from pydantic import BaseModel
@@ -37,6 +36,18 @@ class MetricSeries(BaseModel):
     values: list[float] = []
 
 
+class SpanEntry(BaseModel):
+    span_id: str = ""
+    trace_id: str = ""
+    service: str = ""
+    resource: str = ""
+    operation: str = ""
+    duration_ns: int = 0
+    status: str = ""
+    tags: list[str] = []
+    timestamp: str = ""
+
+
 class InvestigationRequest(BaseModel):
     query: str
     tags: dict[str, str] = {}
@@ -70,6 +81,11 @@ class MetricsResult(SignalResult):
     total: int = 0
 
 
+class SpansResult(SignalResult):
+    spans: list[SpanEntry] = []
+    total: int = 0
+
+
 class InvestigationResult(BaseModel):
     query: str
     time_range_minutes: int
@@ -77,6 +93,7 @@ class InvestigationResult(BaseModel):
     events: EventsResult = EventsResult()
     monitors: MonitorsResult = MonitorsResult()
     metrics: MetricsResult = MetricsResult()
+    spans: SpansResult = SpansResult()
     total_duration_ms: int = 0
 
 

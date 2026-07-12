@@ -12,5 +12,6 @@ class DatadogKitConfig(BaseModel):
     logs_limit: int = 50
     events_limit: int = 20
     monitors_limit: int = 50
+    spans_limit: int = 20
     parallel_timeout_seconds: int = 120
     signal_timeout_seconds: int = 30
