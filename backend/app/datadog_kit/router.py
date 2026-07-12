@@ -14,11 +14,10 @@ from app.core.schemas.rca import RcaReportRead
 from app.datadog_kit.collector import fetch_all
 from app.datadog_kit.config import DatadogKitConfig
 from app.datadog_kit.diagnosis import analyze
+from app.datadog_kit.models import InvestigationRequest
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
-
-    from app.datadog_kit.models import InvestigationRequest
 
 logger = logging.getLogger(__name__)
 
