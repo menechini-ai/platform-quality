@@ -24,11 +24,15 @@ from datadog_api_client.v1.api.events_api import EventsApi
 from datadog_api_client.v1.api.metrics_api import MetricsApi
 from datadog_api_client.v1.api.monitors_api import MonitorsApi
 from datadog_api_client.v1.api.service_level_objectives_api import ServiceLevelObjectivesApi
+from datadog_api_client.v1.model.slo_threshold import SLOThreshold
+from datadog_api_client.v1.model.slo_timeframe import SLOTimeframe
+from datadog_api_client.v1.model.slo_type import SLOType
 from datadog_api_client.v2.api.incidents_api import IncidentsApi
 from datadog_api_client.v2.api.logs_api import LogsApi
 from datadog_api_client.v2.api.spans_api import SpansApi
 from tenacity import (
     Retrying,
+    retry_any,
     retry_if_exception,
     retry_if_exception_type,
     stop_after_attempt,
@@ -53,131 +57,79 @@ class DatadogClient:
     _instance: Self | None = None
     _lock = threading.Lock()
 
-    def __new__(cls) -> Self:
+    def __new__(cls, *_args: Any, **_kwargs: Any) -> Self:
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
                     cls._instance = super().__new__(cls)
-                    cls._instance._initialised = False
         return cls._instance
 
     def __init__(self) -> None:
-        if self._initialised:
+        if getattr(self, "_initialized", False):
             return
-        self._initialised = True
+        self._initialized = True
+        self._connect()
 
+    def _connect(self) -> None:
         config = Configuration()
-        config.api_key["apiKeyAuth"] = settings.DATADOG_API_KEY
-        config.api_key["appKeyAuth"] = settings.DATADOG_APP_KEY
+        config.api_key["apiKeyAuth"] = settings.DATADOG_API_KEY or ""
+        config.api_key["appKeyAuth"] = settings.DATADOG_APP_KEY or ""
         config.server_variables["site"] = settings.DATADOG_SITE
+        config.unstable_operations["list_incidents"] = True
+        config.unstable_operations["search_incidents"] = True
 
-        self._client = ApiClient(config)
+        if not settings.DATADOG_API_KEY or not settings.DATADOG_APP_KEY:
+            logger.warning(
+                "DATADOG_API_KEY / DATADOG_APP_KEY not set; client may fail to authenticate"
+            )
 
-        # V1 APIs
-        self.events = EventsApi(self._client)
-        self.metrics = MetricsApi(self._client)
-        self.monitors = MonitorsApi(self._client)
-        self.slos = ServiceLevelObjectivesApi(self._client)
+        self._api_client = ApiClient(config)
+        self.metrics = MetricsApi(self._api_client)
+        self.monitors = MonitorsApi(self._api_client)
+        self.events = EventsApi(self._api_client)
+        self.slos = ServiceLevelObjectivesApi(self._api_client)
+        self.incidents = IncidentsApi(self._api_client)
+        self.logs = LogsApi(self._api_client)
+        self.spans = SpansApi(self._api_client)
 
-        # V2 APIs
-        self.incidents = IncidentsApi(self._client)
-        self.logs = LogsApi(self._client)
-        self.spans = SpansApi(self._client)
+    @classmethod
+    def get_instance(cls) -> Self:
+        """Return the shared singleton, creating it on first use."""
+        return cls()
 
-    def close(self) -> None:
-        """Close underlying HTTP client and reset singleton."""
-        if self._client:
-            self._client.close()
-        type(self)._instance = None
-        self._initialised = False
+    async def query_metrics(self, query: str, from_ts: int, to_ts: int) -> Any:
+        """Query Datadog metrics via the shared retry/thread-offload path."""
+        return await self.call(self.metrics.query_metrics, query=query, _from=from_ts, to=to_ts)
 
-    # V1 Events
-    def get_events(self, **kwargs: Any) -> dict[str, Any]:
-        """List events (V1 EventsApi)."""
-        response = self.events.list_events(**kwargs)
-        return response.to_dict()
-
-    # V1 Metrics
-    def query_metrics(
-        self,
-        query: str,
-        _from: int,
-        to: int,
-        **kwargs: Any,
-    ) -> dict[str, Any]:
-        """Query timeseries metrics (V1 MetricsApi)."""
-        response = self.metrics.query_metrics(
-            _from=_from,
-            to=to,
-            query=query,
-            **kwargs,
-        )
-        return response.to_dict()
-
-    # V1 Monitors
     def list_monitors(self, **kwargs: Any) -> list[dict[str, Any]]:
-        """List all monitors."""
+        """List all Datadog monitors."""
         response = self.monitors.list_monitors(**kwargs)
         return [m.to_dict() for m in response]
 
-    def get_monitor(self, monitor_id: int, **kwargs: Any) -> dict[str, Any]:
-        """Get a single monitor by ID."""
-        response = self.monitors.get_monitor(monitor_id=monitor_id, **kwargs)
-        return response.to_dict()
-
-    def create_monitor(self, **kwargs: Any) -> dict[str, Any]:
-        """Create a new monitor."""
-        response = self.monitors.create_monitor(**kwargs)
-        return response.to_dict()
-
-    def update_monitor(self, monitor_id: int, **kwargs: Any) -> dict[str, Any]:
-        """Update an existing monitor."""
-        response = self.monitors.update_monitor(monitor_id=monitor_id, **kwargs)
-        return response.to_dict()
-
-    def delete_monitor(self, monitor_id: int, **kwargs: Any) -> dict[str, Any]:
-        """Delete a monitor."""
-        response = self.monitors.delete_monitor(monitor_id=monitor_id, **kwargs)
-        return response.to_dict()
-
-    # V1 SLOs
-    def list_slos(self, **kwargs: Any) -> dict[str, Any]:
-        """List all SLOs."""
-        response = self.slos.list_slos(**kwargs)
-        return response.to_dict()
-
-    def get_slo(self, slo_id: str, **kwargs: Any) -> dict[str, Any]:
-        """Get a single SLO by ID."""
-        response = self.slos.get_slo(slo_id=slo_id, **kwargs)
-        return response.to_dict()
-
-    def create_slo(self, **kwargs: Any) -> dict[str, Any]:
-        """Create a new SLO."""
-        response = self.slos.create_slo(**kwargs)
-        return response.to_dict()
-
-    # V2 Incidents
-    def list_incidents(self, **kwargs: Any) -> dict[str, Any]:
-        """List incidents with optional filters."""
+    def list_incidents(self, **kwargs: Any) -> list[dict[str, Any]]:
+        """List Datadog incidents."""
+        # Map page_number -> page_offset for SDK
+        if "page_number" in kwargs:
+            kwargs["page_offset"] = kwargs.pop("page_number")
         response = self.incidents.list_incidents(**kwargs)
-        return response.to_dict()
+        # Unstable operations return raw dict, not SDK wrapper
+        if hasattr(response, "to_dict"):
+            raw = response.to_dict()
+            data = raw.get("data", [])
+            return [i.to_dict() if hasattr(i, "to_dict") else i for i in data]
+        data = response.get("data", [])
+        return [i.to_dict() if hasattr(i, "to_dict") else i for i in data]
 
-    def get_incident(self, incident_id: str, **kwargs: Any) -> dict[str, Any]:
+    def get_incident(self, incident_id: str) -> dict[str, Any]:
         """Get a single incident by ID."""
-        response = self.incidents.get_incident(incident_id=incident_id, **kwargs)
+        response = self.incidents.get_incident(incident_id=incident_id)
         return response.to_dict()
 
-    def create_incident(self, **kwargs: Any) -> dict[str, Any]:
-        """Create a new incident."""
-        response = self.incidents.create_incident(**kwargs)
-        return response.to_dict()
+    def search_incidents(self, query: str) -> list[dict[str, Any]]:
+        """Search incidents by query string."""
+        response = self.incidents.search_incidents(query=query)
+        return [i.to_dict() for i in (response.data or [])]
 
-    def update_incident(self, incident_id: str, **kwargs: Any) -> dict[str, Any]:
-        """Update an incident."""
-        response = self.incidents.update_incident(incident_id=incident_id, **kwargs)
-        return response.to_dict()
-
-    # V2 Logs
     def search_logs(self, query: str, **kwargs: Any) -> dict[str, Any]:
         """Search logs via Datadog Logs API (V2)."""
         from datetime import datetime
@@ -187,6 +139,7 @@ class DatadogClient:
             LogsListRequestPage,
         )
         from datadog_api_client.v2.model.logs_query_filter import LogsQueryFilter
+        from datadog_api_client.v2.model.logs_sort import LogsSort
 
         filt = LogsQueryFilter(query=query)
         page = LogsListRequestPage()
@@ -201,14 +154,76 @@ class DatadogClient:
             filt.indexes = kwargs.pop("indexes")
         if "limit" in kwargs:
             page.limit = kwargs.pop("limit")
-        if "sort" in kwargs:
-            page.sort = kwargs.pop("sort")
 
-        request = LogsListRequest(filter=filt, page=page, **kwargs)
+        body = {"filter": filt, "page": page}
+
+        if "sort" in kwargs:
+            sort_val = kwargs.pop("sort")
+            if sort_val == "-timestamp":
+                body["sort"] = LogsSort.TIMESTAMP_DESCENDING
+            elif sort_val == "timestamp":
+                body["sort"] = LogsSort.TIMESTAMP_ASCENDING
+            elif isinstance(sort_val, LogsSort):
+                body["sort"] = sort_val
+
+        request = LogsListRequest(**body)
         response = self.logs.list_logs(body=request)
         return response.to_dict()
 
-    # V2 Spans (APM)
+    def list_slos(self, **kwargs: Any) -> list[dict[str, Any]]:
+        """List all SLOs."""
+        response = self.slos.list_slos(**kwargs)
+        raw = response.to_dict()
+        data = raw.get("data", [])
+        return [s.to_dict() if hasattr(s, "to_dict") else s for s in data]
+
+    def create_slo(
+        self,
+        name: str,
+        monitor_ids: list[int],
+        target: float = 99.0,
+        warning: float | None = None,
+        timeframe: str = "30d",
+        tags: list[str] | None = None,
+    ) -> dict[str, Any] | None:
+        """Create a monitor-based SLO. Warning must be > target."""
+        if not self._api_client:
+            return None
+        from datadog_api_client.v1.model.service_level_objective_request import (
+            ServiceLevelObjectiveRequest,
+        )
+
+        if warning is not None and warning <= target:
+            warning = target + 0.5
+        timeframe_map = {
+            "7d": SLOTimeframe.SEVEN_DAYS,
+            "30d": SLOTimeframe.THIRTY_DAYS,
+            "90d": SLOTimeframe.NINETY_DAYS,
+        }
+        body = ServiceLevelObjectiveRequest(
+            type=SLOType.MONITOR,
+            name=name,
+            thresholds=[
+                SLOThreshold(
+                    target=target,
+                    timeframe=timeframe_map.get(timeframe, SLOTimeframe.THIRTY_DAYS),
+                    warning=warning or target + 0.5,
+                )
+            ],
+            monitor_ids=monitor_ids,
+            tags=tags or ["team:observai"],
+        )
+        response = self.slos.create_slo(body=body)
+        return response.to_dict()
+
+    def create_event(self, title: str, text: str, **kwargs: Any) -> dict[str, Any]:
+        """Post an event to Datadog."""
+        from datadog_api_client.v1.model.event_create_request import EventCreateRequest
+
+        body = EventCreateRequest(title=title, text=text, **kwargs)
+        response = self.events.create_event(body=body)
+        return response.to_dict()
+
     def list_spans(self, query: str, **kwargs: Any) -> dict[str, Any]:
         """Search APM spans (V2 SpansApi)."""
         from datetime import datetime
@@ -235,14 +250,60 @@ class DatadogClient:
         compute = kwargs.pop("compute", None)
         group_by = kwargs.pop("group_by", None)
 
+        body = {}
+        if body_filter["query"]:
+            body["filter"] = body_filter
         if compute:
-            body_filter["compute"] = compute
-        if group_by:
-            body_filter["group_by"] = group_by
+            from datadog_api_client.v2.model.spans_compute import SpansCompute
 
-        request = SpansAggregateRequest(filter=body_filter, **kwargs)
+            body["compute"] = [SpansCompute(**compute)]
+        if group_by:
+            body["group_by"] = group_by
+        # Pass timestamps (SDK uses _from/_to to avoid `from` reserved word)
+        for key, dest in (("filter_from", "_from"), ("filter_to", "_to")):
+            val = kwargs.pop(key, None)
+            if val is not None and "filter" in body:
+                body["filter"][dest] = val
+
+        request = SpansAggregateRequest(**body) if body else SpansAggregateRequest()
         response = self.spans.aggregate_spans(body=request)
         return response.to_dict()
+
+    def aggregate_logs(self, **kwargs: Any) -> dict[str, Any]:
+        """Aggregate logs count by group_by facets."""
+        from datadog_api_client.v2.model.logs_aggregate_request import LogsAggregateRequest
+
+        body_filter = {"query": kwargs.pop("filter_query", None)}
+        compute = kwargs.pop("compute", None)
+        group_by = kwargs.pop("group_by", None)
+
+        body = {}
+        if body_filter["query"]:
+            body["filter"] = body_filter
+        if compute:
+            from datadog_api_client.v2.model.logs_compute import LogsCompute
+
+            body["compute"] = [LogsCompute(**compute)]
+        if group_by:
+            body["group_by"] = group_by
+        for key, dest in (("filter_from", "_from"), ("filter_to", "_to")):
+            val = kwargs.pop(key, None)
+            if val is not None and "filter" in body:
+                body["filter"][dest] = val
+
+        request = LogsAggregateRequest(**body) if body else LogsAggregateRequest()
+        response = self.logs.aggregate_logs(body=request)
+        return response.to_dict()
+
+    def close(self) -> None:
+        """Close the underlying API client and reset the singleton.
+
+        The next DatadogClient() acquisition transparently rebuilds a fresh
+        connection, so close() never permanently breaks acquisition (FR-008).
+        """
+        if getattr(self, "_api_client", None) is not None:
+            self._api_client.close()
+        type(self)._instance = None
 
     @staticmethod
     def _is_retryable_api_error(exc: BaseException) -> bool:
@@ -274,9 +335,9 @@ async def _call_with_retry(func: Callable[..., Any], *args: Any, **kwargs: Any) 
     retryer = Retrying(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=30),
-        retry=(
-            retry_if_exception_type(RETRYABLE_EXCEPTIONS)
-            | retry_if_exception(DatadogClient._is_retryable_api_error)
+        retry=retry_any(
+            retry_if_exception_type(RETRYABLE_EXCEPTIONS),
+            retry_if_exception(DatadogClient._is_retryable_api_error),
         ),
     )
 

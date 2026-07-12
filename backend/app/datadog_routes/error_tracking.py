@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
@@ -9,6 +10,8 @@ from fastapi import APIRouter, HTTPException, Query
 from app.datadog.filters import compose_filters, period_to_range, to_domain_kwargs
 from app.datadog.schemas import DatadogFilter, Period
 from app.datadog.write_guard import get_datadog_url, get_headers, sanitize_error_message
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -32,8 +35,14 @@ async def list_error_trackers(
             if "filter[tags]" in fkw:
                 params["filter[tags]"] = fkw["filter[tags]"]
             resp = await hc.get(url, headers=get_headers(), params=params)
+            if resp.status_code == 404:
+                logger.warning(
+                    "Datadog Error Tracking endpoint returned 404 (feature unavailable on %s)",
+                    get_datadog_url(),
+                )
+                return []
             resp.raise_for_status()
-            return resp.json()
+            return resp.json().get("data", [])
     except Exception as e:
         raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
 
@@ -47,8 +56,19 @@ async def get_error_tracker(tracker_id: str):
         async with httpx.AsyncClient() as hc:
             url = f"{get_datadog_url()}/api/v2/error_trackers/{tracker_id}"
             resp = await hc.get(url, headers=get_headers())
+            if resp.status_code == 404:
+                logger.warning(
+                    "Datadog Error Tracking endpoint returned 404 (feature unavailable on %s)",
+                    get_datadog_url(),
+                )
+                raise HTTPException(
+                    status_code=404,
+                    detail="Error Tracking is not available on this Datadog site/account",
+                )
             resp.raise_for_status()
             return resp.json()
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
 
@@ -92,6 +112,12 @@ async def search_error_events(
         async with httpx.AsyncClient() as hc:
             url = f"{get_datadog_url()}/api/v2/error_events"
             resp = await hc.post(url, headers=get_headers(), json=body)
+            if resp.status_code == 404:
+                logger.warning(
+                    "Datadog Error Tracking endpoint returned 404 (unavailable on %s)",
+                    get_datadog_url(),
+                )
+                return {"data": []}
             resp.raise_for_status()
             return resp.json()
     except Exception as e:
