@@ -4,6 +4,15 @@ export default {
   theme: {
     extend: {
       colors: {
+        mocha: {
+          base: "#11111b",
+          mantle: "#1e1e2e",
+          crust: "#313244",
+          overlay: "#45475a",
+          surface: "#181825",
+          text: "#cdd6f4",
+          subtext: "#a6adc8",
+        },
         brand: {
           50: "#ecfeff",
           100: "#cffafe",

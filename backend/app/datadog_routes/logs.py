@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import ast
+
 from fastapi import APIRouter, HTTPException, Query
 
 from app.datadog.client import DatadogClient
@@ -11,6 +13,27 @@ from app.datadog.schemas import DatadogFilter, Period
 from app.datadog.write_guard import sanitize_error_message
 
 router = APIRouter()
+
+
+def _flatten_log(item: dict) -> dict:
+    attr = item.get("attributes", {}) or {}
+    tags = attr.get("tags")
+    if isinstance(tags, str):
+        try:
+            tags = ast.literal_eval(tags)
+        except (ValueError, SyntaxError):
+            tags = [tags] if tags else []
+    elif not isinstance(tags, list):
+        tags = []
+    return {
+        "id": item.get("id"),
+        "content": attr.get("message"),
+        "service": attr.get("service"),
+        "host": attr.get("host"),
+        "tags": tags,
+        "timestamp": attr.get("timestamp"),
+        "status": attr.get("status"),
+    }
 
 
 @router.get("/datadog/logs")
@@ -37,7 +60,14 @@ async def list_logs(
             filter_from=fkw.get("from", from_ts),
             filter_to=fkw.get("to", to_ts),
         )
-        return maybe_human(r, fmt_logs, human, meta={"query": combined or None})
+        items = r.get("data", []) if isinstance(r, dict) else []
+        if human:
+            return maybe_human(items, fmt_logs, True, meta={"query": combined or None})
+        return {
+            "data": [_flatten_log(i) for i in items],
+            "links": r.get("links"),
+            "meta": r.get("meta"),
+        }
     except Exception as e:
         raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
 
@@ -65,7 +95,7 @@ async def submit_log(
     body = HTTPLog([item])
     try:
         r = client.logs.submit_log(body=body)
-        return {"status": "ok", "response": r.to_dict()}
+        return {"status": "ok", "response": r}
     except Exception as e:
         raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
 

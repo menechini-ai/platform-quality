@@ -1,12 +1,11 @@
 """Report / postmortem / notebook models."""
 
-from __future__ import annotations
-
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, Column, DateTime, String, Text
+from sqlalchemy import JSON, DateTime, String, Text
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
 
@@ -18,19 +17,13 @@ class Report(Base):
 
     __tablename__ = "reports"
 
-    id = Column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-    )
-    report_type = Column(
-        String(50), nullable=False
-    )  # executive | monthly | team_health | postmortem | investigation
-    title = Column(String(500), nullable=False)
-    content = Column(Text, nullable=False)  # Markdown
-    tags = Column(JSON, nullable=True, default=list)
-    metadata_ = Column("metadata", JSON, nullable=True, default=dict)
-    created_at = Column(
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    report_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    tags: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
+    metadata_: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         default=lambda: datetime.now(UTC),

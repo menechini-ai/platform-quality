@@ -10,7 +10,7 @@ from app.datadog.client import DatadogClient
 from app.datadog.filters import compose_filters, to_domain_kwargs
 from app.datadog.formatters import fmt_spans, maybe_human
 from app.datadog.schemas import DatadogFilter, Period
-from app.datadog.write_guard import sanitize_error_message
+from app.datadog.write_guard import friendly_datadog_error
 
 router = APIRouter()
 
@@ -47,7 +47,8 @@ async def list_services(
         )
         return maybe_human(r, fmt_spans, human, meta={"query": query})
     except Exception as e:
-        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
+        status, detail = friendly_datadog_error(e)
+        raise HTTPException(status_code=status, detail=detail) from e
 
 
 @router.get("/datadog/apm/spans")
@@ -87,7 +88,8 @@ async def list_spans(
         )
         return maybe_human(r, fmt_spans, human, meta={"query": combined})
     except Exception as e:
-        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
+        status, detail = friendly_datadog_error(e)
+        raise HTTPException(status_code=status, detail=detail) from e
 
 
 @router.get("/datadog/apm/resources")
@@ -125,7 +127,8 @@ async def list_resources(
         )
         return maybe_human(r, fmt_spans, human, meta={"query": query})
     except Exception as e:
-        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
+        status, detail = friendly_datadog_error(e)
+        raise HTTPException(status_code=status, detail=detail) from e
 
 
 @router.get("/datadog/apm/services/{service_name}/definition")
@@ -133,7 +136,7 @@ async def get_service_definition(service_name: str):
     """Get service definition (schema, team, contacts)."""
     import httpx
 
-    from app.datadog.write_guard import get_datadog_url, get_headers
+    from app.datadog.write_guard import friendly_datadog_error, get_datadog_url, get_headers
 
     try:
         async with httpx.AsyncClient() as hc:
@@ -142,7 +145,8 @@ async def get_service_definition(service_name: str):
             resp.raise_for_status()
             return resp.json()
     except Exception as e:
-        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
+        status, detail = friendly_datadog_error(e)
+        raise HTTPException(status_code=status, detail=detail) from e
 
 
 @router.get("/datadog/apm/services/{service_name}/dependencies")
@@ -152,7 +156,7 @@ async def get_service_dependencies(service_name: str, days: int = Query(7, ge=1,
 
     import httpx
 
-    from app.datadog.write_guard import get_datadog_url, get_headers
+    from app.datadog.write_guard import friendly_datadog_error, get_datadog_url, get_headers
 
     now = int(datetime.now(UTC).timestamp())
     from_ts = now - 3600 * 24 * days
@@ -163,7 +167,8 @@ async def get_service_dependencies(service_name: str, days: int = Query(7, ge=1,
             resp.raise_for_status()
             return resp.json()
     except Exception as e:
-        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
+        status, detail = friendly_datadog_error(e)
+        raise HTTPException(status_code=status, detail=detail) from e
 
 
 @router.get("/datadog/apm/dependencies")
@@ -173,7 +178,7 @@ async def list_all_dependencies(days: int = Query(7, ge=1, le=30)):
 
     import httpx
 
-    from app.datadog.write_guard import get_datadog_url, get_headers
+    from app.datadog.write_guard import friendly_datadog_error, get_datadog_url, get_headers
 
     now = int(datetime.now(UTC).timestamp())
     from_ts = now - 3600 * 24 * days
@@ -184,4 +189,5 @@ async def list_all_dependencies(days: int = Query(7, ge=1, le=30)):
             resp.raise_for_status()
             return resp.json()
     except Exception as e:
-        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
+        status, detail = friendly_datadog_error(e)
+        raise HTTPException(status_code=status, detail=detail) from e

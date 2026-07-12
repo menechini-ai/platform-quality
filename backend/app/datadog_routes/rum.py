@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Query
 from app.datadog.client import DatadogClient
 from app.datadog.filters import compose_filters, to_domain_kwargs
 from app.datadog.schemas import DatadogFilter, Period
-from app.datadog.write_guard import sanitize_error_message
+from app.datadog.write_guard import friendly_datadog_error
 
 router = APIRouter()
 
@@ -31,15 +31,22 @@ async def search_rum_events(
     combined = " ".join(p for p in [query, fkw.get("query")] if p)
     try:
         from datadog_api_client.v2.api.rum_api import RUMApi
+        from datadog_api_client.v2.model.rum_query_filter import RUMQueryFilter
+        from datadog_api_client.v2.model.rum_query_page_options import RUMQueryPageOptions
         from datadog_api_client.v2.model.rum_search_events_request import RUMSearchEventsRequest
+        from datadog_api_client.v2.model.rum_sort import RUMSort
 
         api = RUMApi(client._api_client)
+        sort_enum = (
+            RUMSort.TIMESTAMP_DESCENDING if sort == "-@timestamp" else RUMSort.TIMESTAMP_ASCENDING
+        )
         body = RUMSearchEventsRequest(
-            filter={"query": combined, "from": from_ts, "to": now},
-            page={"limit": limit},
-            sort=sort,
+            filter=RUMQueryFilter(query=combined, _from=str(from_ts), to=str(now)),
+            page=RUMQueryPageOptions(limit=limit),
+            sort=sort_enum,
         )
         r = api.search_rum_events(body=body)
         return r.to_dict()
     except Exception as e:
-        raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
+        status, detail = friendly_datadog_error(e)
+        raise HTTPException(status_code=status, detail=detail) from e

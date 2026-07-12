@@ -62,7 +62,7 @@ export function ReportsPage() {
         >
           ← Back to Reports
         </button>
-        <div className="bg-[#1e1e2e] rounded-lg border border-[#313244] p-6">
+        <div className="bgmocha-mantle rounded-lg border bordermocha-crust p-6">
           <div className="flex items-center gap-3 mb-4">
             <span>{reportTypeIcons[selectedReport.report_type] || "📄"}</span>
             <div>
@@ -74,7 +74,7 @@ export function ReportsPage() {
               </p>
             </div>
           </div>
-          <div className="prose prose-invert max-w-none text-sm text-gray-300 whitespace-pre-wrap font-mono bg-[#11111b] rounded-lg p-4">
+          <div className="prose prose-invert max-w-none text-sm text-gray-300 whitespace-pre-wrap font-mono bgmocha-base rounded-lg p-4">
             {selectedReport.content}
           </div>
           {selectedReport.tags && selectedReport.tags.length > 0 && (
@@ -82,7 +82,7 @@ export function ReportsPage() {
               {selectedReport.tags.map((tag: string) => (
                 <span
                   key={tag}
-                  className="text-xs px-2 py-1 rounded bg-[#313244] text-gray-400"
+                  className="text-xs px-2 py-1 rounded bgmocha-crust text-gray-400"
                 >
                   {tag}
                 </span>
@@ -112,11 +112,11 @@ export function ReportsPage() {
 
       {/* Create form */}
       {showCreate && (
-        <div className="bg-[#1e1e2e] rounded-lg border border-[#313244] p-4 space-y-3">
+        <div className="bgmocha-mantle rounded-lg border bordermocha-crust p-4 space-y-3">
           <select
             value={createType}
             onChange={(e) => setCreateType(e.target.value)}
-            className="w-full bg-[#313244] text-white px-3 py-2 rounded border border-[#45475a] text-sm"
+            className="w-full bgmocha-crust text-white px-3 py-2 rounded border bordermocha-overlay text-sm"
           >
             <option value="executive">Executive Summary</option>
             <option value="monthly">Monthly Report</option>
@@ -128,7 +128,7 @@ export function ReportsPage() {
             placeholder="Report title..."
             value={createTitle}
             onChange={(e) => setCreateTitle(e.target.value)}
-            className="w-full bg-[#313244] text-white px-3 py-2 rounded border border-[#45475a] text-sm placeholder-gray-500"
+            className="w-full bgmocha-crust text-white px-3 py-2 rounded border bordermocha-overlay text-sm placeholder-gray-500"
           />
           <button
             onClick={() => createMutation.mutate({ report_type: createType, title: createTitle })}
@@ -151,7 +151,7 @@ export function ReportsPage() {
             <div
               key={report.id}
               onClick={() => setSelectedReport(report)}
-              className="bg-[#1e1e2e] rounded-lg border border-[#313244] p-4 hover:border-blue-500/40 cursor-pointer transition-colors"
+              className="bgmocha-mantle rounded-lg border bordermocha-crust p-4 hover:border-blue-500/40 cursor-pointer transition-colors"
             >
               <div className="flex items-start gap-3">
                 <span className="text-lg mt-1">

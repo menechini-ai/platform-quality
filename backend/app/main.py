@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
+from app.core.logging_config import configure_logging
 
 logger = logging.getLogger(__name__)
 
@@ -16,9 +17,34 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     """Application lifespan: startup / shutdown."""
+    configure_logging()
     logger.info("ObservAI starting up...")
+    await _bootstrap_admin()
     yield
     logger.info("ObservAI shutting down...")
+
+
+async def _bootstrap_admin() -> None:
+    """Create an initial admin from env if none exists (no hardcoded credentials)."""
+    if not settings.INITIAL_ADMIN_USERNAME or not settings.INITIAL_ADMIN_PASSWORD:
+        return
+    from app.auth.service import UserService
+    from app.core.db import async_session_factory
+
+    try:
+        async with async_session_factory() as session:
+            existing = await UserService.get_by_username(session, settings.INITIAL_ADMIN_USERNAME)
+            if existing is None:
+                await UserService.create_user(
+                    session,
+                    settings.INITIAL_ADMIN_USERNAME,
+                    settings.INITIAL_ADMIN_PASSWORD,
+                    role="admin",
+                )
+                await session.commit()
+                logger.info("Created initial admin user '%s'", settings.INITIAL_ADMIN_USERNAME)
+    except Exception as exc:  # noqa: BLE001 - bootstrap must not block startup
+        logger.warning("Admin bootstrap skipped: %s", exc)
 
 
 def create_app() -> FastAPI:
@@ -39,13 +65,14 @@ def create_app() -> FastAPI:
     )
 
     # Routers
+    from app.agents.router import router as agents_router
     from app.analysis.router import router as analysis_router
     from app.auth.router import router as auth_router
     from app.datadog_routes.apm import router as apm_router
     from app.datadog_routes.error_tracking import router as error_tracking_router
     from app.datadog_routes.events import router as events_router
     from app.datadog_routes.fleet import router as fleet_router
-    from app.datadog_routes.incidents import router as dd_incidents_router
+    from app.datadog_routes.incidents import router as datadog_incidents_router
     from app.datadog_routes.logs import router as logs_router
     from app.datadog_routes.metrics import router as metrics_router
     from app.datadog_routes.metrics_explore import router as metrics_explore_router
@@ -76,13 +103,14 @@ def create_app() -> FastAPI:
     app.include_router(metrics_router, prefix=prefix, tags=["datadog-metrics"])
     app.include_router(metrics_explore_router, prefix=prefix, tags=["datadog-metrics"])
     app.include_router(apm_router, prefix=prefix, tags=["datadog-apm"])
-    app.include_router(dd_incidents_router, prefix=prefix, tags=["datadog-incidents"])
+    app.include_router(datadog_incidents_router, prefix=prefix, tags=["datadog-incidents"])
     app.include_router(fleet_router, prefix=prefix, tags=["datadog-fleet"])
     app.include_router(rum_router, prefix=prefix, tags=["datadog-rum"])
     app.include_router(synthetics_router, prefix=prefix, tags=["datadog-synthetics"])
     app.include_router(slos_router, prefix=prefix, tags=["datadog-slos"])
     app.include_router(kb_router, prefix=prefix, tags=["knowledge-base"])
     app.include_router(analysis_router, prefix=prefix, tags=["analysis"])
+    app.include_router(agents_router, prefix=prefix, tags=["agents"])
 
     @app.get("/health")
     async def health_check():

@@ -1,18 +1,33 @@
+import { useState } from "react";
 import { useSynthetics } from "@/api/client";
 import { TestTube, CheckCircle2 } from "lucide-react";
 
 export function SyntheticsPage() {
-  const { data: tests, isLoading } = useSynthetics();
+  const [tagsFilter, setTagsFilter] = useState("");
+  const { data: tests, isLoading } = useSynthetics(
+    tagsFilter ? { tags: tagsFilter } : undefined,
+  );
 
   if (isLoading) return <div className="animate-pulse text-slate-500 font-mono text-sm">Loading synthetic tests...</div>;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Synthetics</h1>
-        <p className="text-sm text-slate-500 mt-1 font-mono">
-          Synthetic tests &mdash; {tests?.length ?? 0} total
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Synthetics</h1>
+          <p className="text-sm text-slate-500 mt-1 font-mono">
+            Synthetic tests &mdash; {tests?.length ?? 0} total
+          </p>
+        </div>
+        <input
+          type="text"
+          value={tagsFilter}
+          onChange={(e) => setTagsFilter(e.target.value)}
+          placeholder="Tags (e.g. env:prod,service:api)"
+          className="px-3 py-2 rounded-lg bg-surface-800 border border-surface-600
+                     text-white text-sm placeholder:text-slate-500 w-72
+                     focus:outline-none focus:ring-2 focus:ring-brand-500"
+        />
       </div>
 
       {!tests || tests.length === 0 ? (

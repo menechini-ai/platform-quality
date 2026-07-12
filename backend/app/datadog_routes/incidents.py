@@ -71,10 +71,16 @@ async def create_datadog_incident(
     """Create a Datadog incident."""
     assert_write_allowed()
     client = DatadogClient()
-    attrs: dict[str, Any] = {"title": title}
-    if customer_impact:
-        attrs["customer_impact"] = customer_impact
-    body = {"data": {"attributes": attrs}}
+    from datadog_api_client.v2.model.incident_create_attributes import IncidentCreateAttributes
+    from datadog_api_client.v2.model.incident_create_data import IncidentCreateData
+    from datadog_api_client.v2.model.incident_create_request import IncidentCreateRequest
+    from datadog_api_client.v2.model.incident_type import IncidentType
+
+    data = IncidentCreateData(
+        attributes=IncidentCreateAttributes(title=title, customer_impacted=bool(customer_impact)),
+        type=IncidentType.INCIDENTS,
+    )
+    body = IncidentCreateRequest(data=data)
     try:
         r = client.incidents.create_incident(body=body)
         return r.to_dict()
@@ -87,7 +93,17 @@ async def update_datadog_incident(incident_id: str, title: str):
     """Update a Datadog incident."""
     assert_write_allowed()
     client = DatadogClient()
-    body = {"data": {"attributes": {"title": title}}}
+    from datadog_api_client.v2.model.incident_type import IncidentType
+    from datadog_api_client.v2.model.incident_update_attributes import IncidentUpdateAttributes
+    from datadog_api_client.v2.model.incident_update_data import IncidentUpdateData
+    from datadog_api_client.v2.model.incident_update_request import IncidentUpdateRequest
+
+    data = IncidentUpdateData(
+        id=incident_id,
+        type=IncidentType.INCIDENTS,
+        attributes=IncidentUpdateAttributes(title=title),
+    )
+    body = IncidentUpdateRequest(data=data)
     try:
         r = client.incidents.update_incident(incident_id=incident_id, body=body)
         return r.to_dict()

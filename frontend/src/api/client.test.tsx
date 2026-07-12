@@ -63,22 +63,29 @@ describe("useDdMonitors", () => {
 // ─── Logs ─────────────────────────────────────────────
 
 describe("useDdLogs", () => {
-  it("does NOT send query param when no filter provided", async () => {
+  it("does NOT fetch when no filter provided (no match-all default)", async () => {
     const spy = vi.spyOn(globalThis, "fetch").mockImplementation(() => fakeJson([]));
     renderHook(() => useDdLogs(), { wrapper: createWrapper() });
-    await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
-    const url = spy.mock.calls[0][0] as string;
-    expect(url).toContain("/datadog/logs");
-    expect(url).toContain("limit=50");
-    expect(url).not.toContain("query=");
+    // Give React a tick; the query must stay disabled (enabled requires query or tags)
+    await new Promise((r) => setTimeout(r, 50));
+    expect(spy).not.toHaveBeenCalled();
   });
 
-  it("sends query when explicitly provided", async () => {
+  it("fetches when query provided", async () => {
     const spy = vi.spyOn(globalThis, "fetch").mockImplementation(() => fakeJson([]));
     renderHook(() => useDdLogs({ query: "service:api" }), { wrapper: createWrapper() });
     await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
     const url = spy.mock.calls[0][0] as string;
     expect(url).toContain("query=service%3Aapi");
+    expect(url).not.toContain("*");
+  });
+
+  it("fetches when only tags provided", async () => {
+    const spy = vi.spyOn(globalThis, "fetch").mockImplementation(() => fakeJson([]));
+    renderHook(() => useDdLogs({ tags: "env:prod" }), { wrapper: createWrapper() });
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+    const url = spy.mock.calls[0][0] as string;
+    expect(url).toContain("tags=env%3Aprod");
   });
 });
 

@@ -1,0 +1,261 @@
+services:
+  # ── user-service ──────────────────────────────────────────────
+  user-service:
+    build:
+      context: /Users/adilsonmenechini/SRE/AI/platform-quality/api-demo
+      dockerfile: services/user-service/Dockerfile
+    env_file:
+      - .env
+    environment:
+      SERVICE: user-service
+      ENV: demo
+      DB_PATH: /data/users.db
+      DD_API_KEY: ${DATADOG_API_KEY}
+      DD_SITE: ${DATADOG_SITE}
+      DD_SERVICE: user-service
+      DD_ENV: demo
+      DD_AGENT_HOST: dd-agent
+      DD_TRACE_AGENT_URL: http://dd-agent:8126
+
+    ports:
+      - "8001:8001"
+    volumes:
+      - userdata:/data
+    networks:
+      - demo-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    mem_limit: 256m
+    cpus: "0.5"
+
+  user-service-dev:
+    build:
+      context: /Users/adilsonmenechini/SRE/AI/platform-quality/api-demo
+      dockerfile: services/user-service/Dockerfile
+    env_file:
+      - .env
+    environment:
+      SERVICE: user-service
+      ENV: dev
+      DB_PATH: /data/users-dev.db
+      DD_API_KEY: ${DATADOG_API_KEY}
+      DD_SITE: ${DATADOG_SITE}
+      DD_SERVICE: user-service
+      DD_ENV: dev
+      DD_AGENT_HOST: dd-agent
+      DD_TRACE_AGENT_URL: http://dd-agent:8126
+
+    volumes:
+      - userdata-dev:/data
+    networks:
+      - demo-net
+    mem_limit: 128m
+    cpus: "0.25"
+
+  user-service-prd:
+    build:
+      context: /Users/adilsonmenechini/SRE/AI/platform-quality/api-demo
+      dockerfile: services/user-service/Dockerfile
+    env_file:
+      - .env
+    environment:
+      SERVICE: user-service
+      ENV: prd
+      DB_PATH: /data/users-prd.db
+      DD_API_KEY: ${DATADOG_API_KEY}
+      DD_SITE: ${DATADOG_SITE}
+      DD_SERVICE: user-service
+      DD_ENV: prd
+      DD_AGENT_HOST: dd-agent
+      DD_TRACE_AGENT_URL: http://dd-agent:8126
+
+    volumes:
+      - userdata-prd:/data
+    networks:
+      - demo-net
+    mem_limit: 256m
+    cpus: "0.5"
+
+  # ── api-gateway ───────────────────────────────────────────────
+  api-gateway:
+    build:
+      context: /Users/adilsonmenechini/SRE/AI/platform-quality/api-demo
+      dockerfile: services/api-gateway/Dockerfile
+    env_file:
+      - .env
+    environment:
+      SERVICE: api-gateway
+      ENV: demo
+      USER_SVC_URL: http://user-service:8001
+      DD_API_KEY: ${DATADOG_API_KEY}
+      DD_SITE: ${DATADOG_SITE}
+      DD_SERVICE: api-gateway
+      DD_ENV: demo
+      DD_AGENT_HOST: dd-agent
+      DD_TRACE_AGENT_URL: http://dd-agent:8126
+
+    ports:
+      - "8002:8002"
+    depends_on:
+      user-service:
+        condition: service_started
+    networks:
+      - demo-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    mem_limit: 256m
+    cpus: "0.5"
+
+  api-gateway-dev:
+    build:
+      context: /Users/adilsonmenechini/SRE/AI/platform-quality/api-demo
+      dockerfile: services/api-gateway/Dockerfile
+    env_file:
+      - .env
+    environment:
+      SERVICE: api-gateway
+      ENV: dev
+      USER_SVC_URL: http://user-service:8001
+      DD_API_KEY: ${DATADOG_API_KEY}
+      DD_SITE: ${DATADOG_SITE}
+      DD_SERVICE: api-gateway
+      DD_ENV: dev
+      DD_AGENT_HOST: dd-agent
+      DD_TRACE_AGENT_URL: http://dd-agent:8126
+
+    depends_on:
+      user-service:
+        condition: service_started
+    networks:
+      - demo-net
+    mem_limit: 128m
+    cpus: "0.25"
+
+  api-gateway-prd:
+    build:
+      context: /Users/adilsonmenechini/SRE/AI/platform-quality/api-demo
+      dockerfile: services/api-gateway/Dockerfile
+    env_file:
+      - .env
+    environment:
+      SERVICE: api-gateway
+      ENV: prd
+      USER_SVC_URL: http://user-service:8001
+      DD_API_KEY: ${DATADOG_API_KEY}
+      DD_SITE: ${DATADOG_SITE}
+      DD_SERVICE: api-gateway
+      DD_ENV: prd
+      DD_AGENT_HOST: dd-agent
+      DD_TRACE_AGENT_URL: http://dd-agent:8126
+
+    depends_on:
+      user-service:
+        condition: service_started
+    networks:
+      - demo-net
+    mem_limit: 256m
+    cpus: "0.5"
+
+  # ── test-runner ───────────────────────────────────────────────
+  test-runner:
+    build:
+      context: /Users/adilsonmenechini/SRE/AI/platform-quality/api-demo
+      dockerfile: services/test-runner/Dockerfile
+    env_file:
+      - .env
+    environment:
+      SERVICE: test-runner
+    ports:
+      - "8003:8003"
+    networks:
+      - demo-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    mem_limit: 256m
+    cpus: "0.5"
+
+  # ── demo-ui ───────────────────────────────────────────────────
+  demo-ui:
+    build:
+      context: /Users/adilsonmenechini/SRE/AI/platform-quality/api-demo
+      dockerfile: services/demo-ui/Dockerfile
+    env_file:
+      - .env
+    environment:
+      SERVICE: demo-ui
+      DATADOG_SITE: us5.datadoghq.com
+      DD_API_KEY: ${DATADOG_API_KEY}
+      DD_SITE: ${DATADOG_SITE}
+      DD_SERVICE: demo-ui
+      DD_ENV: demo
+      DD_AGENT_HOST: dd-agent
+      DD_TRACE_AGENT_URL: http://dd-agent:8126
+
+    ports:
+      - "8004:8004"
+    depends_on:
+      - test-runner
+    networks:
+      - demo-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    mem_limit: 256m
+    cpus: "0.5"
+
+  # ── Datadog Agent (receives APM traces from services, forwards to Datadog) ──
+  dd-agent:
+    image: gcr.io/datadoghq/agent:7
+    hostname: dd-agent
+    environment:
+      DD_API_KEY: ${DATADOG_API_KEY}
+      DD_SITE: ${DATADOG_SITE}
+      DD_HOSTNAME: dd-agent
+      DD_APM_ENABLED: "true"
+      # Explicit trace-intake URL. The agent appends "/api/v0.2/traces" itself,
+      # so dd_url must be the bare host (a "/api" suffix double-prefixes and 404s).
+      DD_APM_DD_URL: "https://trace.agent.us5.datadoghq.com"
+      DD_APM_NON_LOCAL_TRAFFIC: "true"
+      DD_DOGSTATSD_NON_LOCAL_TRAFFIC: "true"
+    networks:
+      - demo-net
+    mem_limit: 1g
+    cpus: "1.5"
+
+  # ── OTel Collector (receives OTLP traces from ddtrace, exports DIRECTLY to Datadog,
+  #     bypassing the Datadog Agent's broken span forwarder) ──
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.122.0
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    environment:
+      DD_API_KEY: ${DATADOG_API_KEY}
+      DD_SITE: ${DATADOG_SITE}
+    ports:
+      - "4317:4317"   # OTLP gRPC (receiver)
+      - "4318:4318"   # OTLP HTTP (receiver)
+    networks:
+      - demo-net
+    mem_limit: 512m
+    cpus: "0.5"
+
+networks:
+  demo-net:
+    driver: bridge
+
+volumes:
+  userdata:
+  userdata-dev:
+  userdata-prd:

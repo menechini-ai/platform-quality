@@ -105,7 +105,7 @@ def fmt_metrics(data: list[dict[str, Any]], meta: dict[str, Any] | None = None) 
     for i, ser in enumerate(points[:20]):
         metric = ser.get("metric", "?")
         scope = ser.get("scope", ser.get("tag_set", ""))
-        plen = len(ser.get("pointlist", []))
+        plen = len(ser.get("pointlist", ser.get("points", [])))
         lines.append(f"[{i + 1}] {metric}")
         lines.append(f"     Scope: {scope}  |  Points: {plen}")
     if len(points) > 20:

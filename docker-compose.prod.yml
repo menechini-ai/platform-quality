@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
       POSTGRES_USER: observai
@@ -79,6 +79,12 @@ services:
       - backend
     environment:
       VITE_API_URL: http://localhost:8000/api/v1
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     mem_limit: 256m
     cpus: "0.5"
 

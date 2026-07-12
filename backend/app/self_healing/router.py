@@ -101,7 +101,7 @@ async def approve_action(action_id: str, db: AsyncSession = Depends(get_db)):
         )
 
     action.status = "approved"
-    action.executed_at = datetime.now(UTC)
+    action.completed_at = datetime.now(UTC)
     await db.flush()
     await db.refresh(action)
     return action
@@ -125,7 +125,7 @@ async def reject_action(action_id: str, db: AsyncSession = Depends(get_db)):
         )
 
     action.status = "rejected"
-    action.executed_at = datetime.now(UTC)
+    action.completed_at = datetime.now(UTC)
     await db.flush()
     await db.refresh(action)
     return action

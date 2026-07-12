@@ -104,6 +104,7 @@ export function MaturityPage() {
   const { data: latest, isLoading } = useLatestAssessment();
   const { data: levelsData } = useLevels();
   const [targetLevel, setTargetLevel] = useState(3);
+  const [assessTags, setAssessTags] = useState("");
   const { data: customGaps } = useGapAnalysis(latest?.overall_level ?? 0, targetLevel);
 
   return (
@@ -345,15 +346,27 @@ export function MaturityPage() {
       </div>
 
       {/* Run assessment button */}
-      <button
-        onClick={async () => {
-          await api("/maturity/assess", { method: "POST" });
-          window.location.reload();
-        }}
-        className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-      >
-        Run New Assessment
-      </button>
+      <div className="flex items-center gap-3">
+        <input
+          type="text"
+          value={assessTags}
+          onChange={(e) => setAssessTags(e.target.value)}
+          placeholder="Tags (e.g. env:prod,service:api)"
+          className="flex-1 px-3 py-3 rounded-lg bg-[#1e1e2e] border border-[#313244]
+                     text-white text-sm placeholder:text-gray-500
+                     focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <button
+          onClick={async () => {
+            const params = assessTags ? `?tags=${encodeURIComponent(assessTags)}` : "";
+            await api(`/maturity/assess${params}`, { method: "POST" });
+            window.location.reload();
+          }}
+          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors whitespace-nowrap"
+        >
+          Run New Assessment
+        </button>
+      </div>
 
       {/* Levels reference */}
       {levelsData && (

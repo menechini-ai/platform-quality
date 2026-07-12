@@ -44,3 +44,7 @@ celerybeat-schedule
 
 # Agent working directories
 .sisyphus/
+
+# Playwright MCP local cache/log artifacts
+.playwright-mcp/
+bkpincident

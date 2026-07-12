@@ -17,11 +17,11 @@ ships as an independently testable increment. Branch per gitflow: `001-observai-
 
 ## Phase A: Setup & Quality Gates (blocks all stories)
 
-- [ ] T001 [P] QC — Add CI contract job running ruff, pyright, vulture ≥65, gitleaks, `pytest -m "not datadog"`, and frontend eslint/tsc/vitest (`.github/workflows/ci.yml`); docker build/push gated to `main` only.
-- [ ] T002 [P] QC — Add CI guard that fails if a test touching Datadog lacks `@pytest.mark.datadog` (scan for `datadog-api-client`/`Datadog` usage without the marker); document the convention.
-- [ ] T003 [P] QC — Add `package-lock.json` ↔ `package.json` parity check to CI (fails fast on mismatch).
-- [ ] T004 [P] QC — Add CI job running `alembic upgrade head` against a throwaway Postgres (proves Docker migration path).
-- [ ] T005 [P] QC — Resolve `pyright` warnings in `backend/app/core/` and `backend/app/rca/`; add lint rule banning `from __future__ import annotations` in `core/models/` and `core/schemas/`.
+- [X] T001 [P] QC — Add CI contract job running ruff, pyright, vulture ≥65, gitleaks, `pytest -m "not datadog"`, and frontend eslint/tsc/vitest (`.github/workflows/ci.yml`); docker build/push gated to `main` only.
+- [X] T002 [P] QC — Add CI guard that fails if a test touching Datadog lacks `@pytest.mark.datadog` (scan for `datadog-api-client`/`Datadog` usage without the marker); document the convention.
+- [X] T003 [P] QC — Add `package-lock.json` ↔ `package.json` parity check to CI (fails fast on mismatch).
+- [X] T004 [P] QC — Add CI job running `alembic upgrade head` against a throwaway Postgres (proves Docker migration path).
+- [X] T005 [P] QC — Resolve `pyright` warnings in `backend/app/core/` and `backend/app/rca/`; add lint rule banning `from __future__ import annotations` in `core/models/` and `core/schemas/`.
 - [ ] T006 QC — Smoke test: open a deliberately-broken PR and assert the relevant hook/CI guard fails (pre-commit 7/7 + CI green verification per SC-001).
 
 ---
@@ -30,8 +30,8 @@ ships as an independently testable increment. Branch per gitflow: `001-observai-
 
 - [ ] T010 US1 — Verify incident CRUD + RCA endpoints exist and return `RcaReportRead` with `root_cause` and confidence (`backend/app/incidents/router.py`, `backend/app/rca/router.py`). Add/adjust tests in `backend/tests/test_rca/`.
 - [ ] T011 [P] US1 — Test: `POST /api/v1/rca` returns 201 with non-null `root_cause`; `GET /api/v1/rca/{id}` returns full report; unauthenticated POST returns 401 (no persistence).
-- [ ] T012 US1 — (Roadmap B1) Refactor `backend/app/rca/` into pipeline Discovery→Breadth→Depth→Conclusion with explicit Pydantic state models; add `dependency_chain` field to `RcaReport` (`core/models/rca.py`, `core/schemas/rca.py`).
-- [ ] T013 [P] US1 — Test: each RCA phase covered with mocked Datadog client (TDD); report includes labeled chain (root cause/propagator/victim) + confidence (SC-007).
+- [X] T012 US1 — (Roadmap B1) Refactor `backend/app/rca/` into pipeline Discovery→Breadth→Depth→Conclusion with explicit Pydantic state models; add `dependency_chain` field to `RcaReport` (`core/models/rca.py`, `core/schemas/rca.py`).
+- [X] T013 [P] US1 — Test: each RCA phase covered with mocked Datadog client (TDD); report includes labeled chain (root cause/propagator/victim) + confidence (SC-007).
 
 ---
 
@@ -60,7 +60,7 @@ ships as an independently testable increment. Branch per gitflow: `001-observai-
 
 ## Phase 5: User Story 5 — Quality Gates (P1, cross-cutting)
 
-- [ ] T050 US5 — Verify pre-commit passes 7/7 on changed files; `pyright` clean; `vulture --min-confidence 65` clean; frontend eslint/tsc/vitest green (SC-001, SC-006).
+- [X] T050 US5 — Verify pre-commit passes 7/7 on changed files; `pyright` clean; `vulture --min-confidence 65` clean; frontend eslint/tsc/vitest green (SC-001, SC-006).
 - [ ] T051 [P] US5 — Test: missing `datadog` marker on a credentialed test fails the CI guard (T002); lockfile mismatch fails parity check (T003).
 
 ---
