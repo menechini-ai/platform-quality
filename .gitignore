@@ -47,3 +47,4 @@ celerybeat-schedule
 
 # Playwright MCP local cache/log artifacts
 .playwright-mcp/
+bkpincident

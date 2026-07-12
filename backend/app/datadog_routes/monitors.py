@@ -38,6 +38,9 @@ async def list_monitors(
     client = DatadogClient()
     r = client.monitors.list_monitors(**kwargs, page_size=page_size, page=page)
     data = [m.to_dict() for m in r]
+    # Datadog retains soft-deleted monitors in list_monitors; drop them so the UI
+    # stops showing monitors that no longer exist.
+    data = [m for m in data if not m.get("deleted")]
     return maybe_human(data, fmt_monitors, human, meta={"total": len(data)})
 
 
