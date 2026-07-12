@@ -26,7 +26,7 @@ from datadog_api_client.v1.api.service_level_objectives_api import ServiceLevelO
 from datadog_api_client.v2.api.incidents_api import IncidentsApi
 from datadog_api_client.v2.api.logs_api import LogsApi
 from datadog_api_client.v2.api.spans_api import SpansApi
-from tenacity import Retrying, retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import Retrying, retry, retry_if_exception, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.core.config import settings
 
@@ -77,7 +77,7 @@ class DatadogClient:
     )
     def query_metrics(self, query: str, from_ts: int, to_ts: int) -> dict[str, Any]:
         """Query Datadog metrics timeseries."""
-        response = self.metrics.query_metrics(query=query, from_ts=from_ts, to=to_ts)
+        response = self.metrics.query_metrics(query=query, _from=from_ts, to=to_ts)
         return response.to_dict()
 
     def list_monitors(self, **kwargs: Any) -> list[dict[str, Any]]:
@@ -300,7 +300,7 @@ async def _call_with_retry(func: Callable[..., Any], *args: Any, **kwargs: Any) 
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=30),
         retry=(
-            retry_if_exception_type(RETRYABLE_EXCEPTIONS) | DatadogClient._is_retryable_api_error
+            retry_if_exception_type(RETRYABLE_EXCEPTIONS) | retry_if_exception(DatadogClient._is_retryable_api_error)
         ),
     )
 

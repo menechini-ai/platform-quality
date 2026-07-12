@@ -85,10 +85,10 @@ async def _get_events(
             client.events.list_events,
             start=start_ts,
             end=end_ts,
-            tags=tags_str or None,
+            tags=tags_str,
         )
         duration = int((time.monotonic() - t0) * 1000)
-        data = raw if isinstance(raw, dict) else {}
+        data = raw.to_dict() if hasattr(raw, "to_dict") else (raw if isinstance(raw, dict) else {})
         events_raw = data.get("events", [])
         events = []
         for ev in events_raw:
@@ -123,7 +123,7 @@ async def _list_monitors(
     t0 = time.monotonic()
     try:
         tags_str = ",".join(f"{k}:{v}" for k, v in request.tags.items())
-        raw = await client.call(client.monitors.list_monitors, tags=tags_str or None)
+        raw = await client.call(client.list_monitors, tags=tags_str)
         duration = int((time.monotonic() - t0) * 1000)
         monitors_raw = raw if isinstance(raw, list) else []
         monitors = []
