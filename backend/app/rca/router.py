@@ -13,7 +13,9 @@ from app.core.models.incident import Incident
 from app.core.models.rca import RcaReport
 from app.core.schemas.incident import IncidentRead
 from app.core.schemas.rca import RcaReportCreate, RcaReportRead
+from app.datadog.client import DatadogClient
 from app.llm.rca_service import generate_rca
+from app.rca.engine import ConclusionState, RcaEngine
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -54,7 +56,7 @@ async def create_rca_report(
     data: RcaReportCreate,
     db: AsyncSession = Depends(get_db),
 ):
-    """Generate a new RCA report for an incident."""
+    """Generate a new RCA report for an incident via the multi-phase engine."""
     incident_uid = data.incident_id  # already UUID from Pydantic
 
     # Check if RCA already exists for this incident
@@ -62,10 +64,24 @@ async def create_rca_report(
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="RCA report already exists for this incident")
 
+    context = {"services": data.services} if data.services else {}
+    conclusion = ConclusionState(root_cause="", confidence=0.0, summary="")
+    try:
+        engine = RcaEngine(DatadogClient.get_instance())
+        conclusion = await engine.run(str(incident_uid), context)
+    except Exception as exc:  # noqa: BLE001 - never block report creation on Datadog errors
+        conclusion = ConclusionState(
+            root_cause=data.root_cause or "",
+            summary=f"Engine unavailable: {exc}",
+            confidence=0.0,
+        )
+
     report = RcaReport(
         incident_id=incident_uid,
-        summary=data.summary,
-        root_cause=data.root_cause,
+        summary=data.summary or conclusion.summary,
+        root_cause=data.root_cause or conclusion.root_cause or None,
+        confidence=conclusion.confidence,
+        dependency_chain=conclusion.dependency_chain.model_dump(),
         recommendations=data.recommendations,
     )
     db.add(report)

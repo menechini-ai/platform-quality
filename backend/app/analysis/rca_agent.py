@@ -8,6 +8,7 @@ assessment (CPU, memory, latency, errors, disk, network).
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select
@@ -168,6 +169,30 @@ async def analyze_rca(
             "id": str(rca.id) if rca else None,
         },
     ]
+
+    # ── Datadog correlation ──────────────────────────────────────
+    dd_findings: list[dict[str, Any]] = []
+    try:
+        from app.datadog.client import DatadogClient
+
+        client = DatadogClient()
+        now = int(datetime.now(UTC).timestamp())
+        from_ts = now - 3600 * 24 * 7
+        await client.query_metrics(
+            query="avg:system.cpu.user{*}",
+            from_ts=from_ts,
+            to_ts=now,
+        )
+        dd_findings.append(
+            {
+                "type": "datadog_metrics",
+                "available": True,
+                "detail": "CPU metrics queried for incident timeline",
+            }
+        )
+    except Exception as e:
+        dd_findings.append({"type": "datadog_metrics", "available": False, "detail": str(e)})
+    findings.extend(dd_findings)
 
     # ── Build summary ──────────────────────────────────────────────
     summary_parts = [

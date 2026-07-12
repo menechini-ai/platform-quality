@@ -294,7 +294,7 @@ async def health_stats(
     if days:
         from datetime import datetime, timedelta
 
-        cutoff = datetime.utcnow() - timedelta(days=days)
+        cutoff = datetime.now(UTC) - timedelta(days=days)
         time_filter = Incident.started_at >= cutoff
         base_inc = base_inc.where(time_filter)
     else:
@@ -413,7 +413,7 @@ async def health_forecast(
     """
     from datetime import datetime, timedelta
 
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     lookback = now - timedelta(days=days)
 
     # --- Incident frequency per service ---

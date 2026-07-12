@@ -42,3 +42,37 @@ def sanitize_error_message(message: str) -> str:
     for pattern, replacement in _SANITIZE_PATTERNS:
         message = pattern.sub(replacement, message)
     return message
+
+
+def friendly_datadog_error(exc: Exception) -> tuple[int, str]:
+    """Convert a Datadog API exception to a user-friendly (status_code, detail) pair.
+
+    Handles SDK ApiException subclasses, httpx.HTTPStatusError, and generic errors.
+    Never leaks raw exception messages to the user except as a last resort.
+    """
+    status: int | None = getattr(exc, "status", None)  # datadog SDK ApiException
+    if status is None:
+        resp = getattr(exc, "response", None)  # httpx.HTTPStatusError
+        if resp is not None:
+            status = getattr(resp, "status_code", None)
+
+    if status == 401:
+        return (
+            401,
+            "Datadog API key lacks permission for this feature. "
+            "Verify the API/Application key has the required scope "
+            "in your Datadog organization settings.",
+        )
+    if status == 403:
+        return (
+            403,
+            "Access denied by Datadog. The API key does not have permission for this feature.",
+        )
+    if status == 404:
+        return (
+            404,
+            "This Datadog feature is not enabled for your account. "
+            "Check your Datadog plan or contact support.",
+        )
+
+    return (502, sanitize_error_message(str(exc)))

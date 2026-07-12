@@ -1,5 +1,7 @@
 """SQLAlchemy async engine + session factory."""
 
+from collections.abc import AsyncGenerator
+
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -13,12 +15,18 @@ class Base(DeclarativeBase):
     pass
 
 
-async def get_db() -> AsyncSession:  # type: ignore[misc]
-    """FastAPI dependency that yields an async DB session."""
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """FastAPI dependency that yields an async DB session.
+
+    Commits only when the session has pending changes (writes). Read-only
+    requests close without an empty transaction (gap H3).
+    """
+
     async with async_session_factory() as session:
         try:
             yield session
-            await session.commit()
+            if session.new or session.dirty or session.deleted:
+                await session.commit()
         except Exception:
             await session.rollback()
             raise

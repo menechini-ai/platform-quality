@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 from pydantic import ValidationError
 
 from app.datadog.filters import compose_filters, period_to_range, to_domain_kwargs
-from app.datadog.schemas import DatadogFilter
+from app.datadog.schemas import DatadogFilter, Period
 
 
 def test_datadogfilter_rejects_bad_period():
     with pytest.raises(ValidationError):
-        DatadogFilter(tags=["env:prod"], period="99d")
+        # Intentionally invalid period to verify pydantic rejects it at runtime.
+        DatadogFilter(tags=["env:prod"], period=cast("Period", "99d"))
 
 
 def test_compose_filters_merges_tags_and_falls_back_to_global_period(monkeypatch):
@@ -37,7 +40,9 @@ def test_compose_filters_no_global(monkeypatch):
 
 
 def test_period_to_range_7d():
-    frm, to = period_to_range("7d")
+    rng = period_to_range("7d")
+    assert rng is not None
+    frm, to = rng
     assert 0 < to - frm <= 7 * 86400 + 2
 
 

@@ -1,12 +1,11 @@
 """Maturity assessment model for SRE observability maturity (Levels 0-5)."""
 
-from __future__ import annotations
-
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, Column, DateTime, Float, Integer, Text
+from sqlalchemy import JSON, DateTime, Float, Integer, Text
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
 
@@ -16,22 +15,18 @@ class MaturityAssessment(Base):
 
     __tablename__ = "maturity_assessments"
 
-    id = Column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-    )
-    overall_level = Column(Integer, nullable=False)  # 0-5
-    overall_score = Column(Float, nullable=False)  # 0-100
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    overall_level: Mapped[int] = mapped_column(Integer, nullable=False)
+    overall_score: Mapped[float] = mapped_column(Float, nullable=False)
 
     # Per-dimension scores (0-100)
-    dimensions = Column(JSON, nullable=False, default=dict)
+    dimensions: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
 
     # Raw data from Datadog queries
-    findings = Column(JSON, nullable=True)
+    findings: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
-    summary = Column(Text, nullable=True)
-    created_at = Column(
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         default=lambda: datetime.now(UTC),

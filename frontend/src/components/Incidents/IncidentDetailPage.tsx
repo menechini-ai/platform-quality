@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useIncident, useRcaReports, api } from "@/api/client";
 import {
   ArrowLeft,
@@ -25,6 +26,7 @@ export function IncidentDetailPage() {
   const { data: incident, isLoading } = useIncident(id!);
   const { data: allRcas } = useRcaReports();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const [showRcaForm, setShowRcaForm] = useState(false);
   const [rcaForm, setRcaForm] = useState<RcaForm>({
@@ -81,8 +83,8 @@ export function IncidentDetailPage() {
       });
       setShowRcaForm(false);
       setRcaForm({ summary: "", root_cause: "", recommendations: "" });
-      // Force refetch by navigating away and back
-      window.location.reload();
+      queryClient.invalidateQueries({ queryKey: ["incident", id] });
+      queryClient.invalidateQueries({ queryKey: ["rca"] });
     } catch (err) {
       setRcaError(err instanceof Error ? err.message : "Failed to create RCA");
     } finally {

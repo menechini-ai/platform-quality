@@ -65,7 +65,7 @@ async def submit_log(
     body = HTTPLog([item])
     try:
         r = client.logs.submit_log(body=body)
-        return {"status": "ok", "response": r.to_dict()}
+        return {"status": "ok", "response": r}
     except Exception as e:
         raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
 

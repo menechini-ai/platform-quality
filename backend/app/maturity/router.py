@@ -25,7 +25,7 @@ def _collect_datadog_data(tags: str | None = None) -> dict[str, Any]:
         tags: Optional tag filter (e.g. ``"service:api-gateway,env:prod"``).
     """
     try:
-        dd = DatadogClient()
+        dd = DatadogClient.get_instance()
     except Exception:
         return {}
 
@@ -42,7 +42,6 @@ def _collect_datadog_data(tags: str | None = None) -> dict[str, Any]:
         slos = dd.list_slos(tags_query=tags) if tags else dd.list_slos()
         incs = dd.list_incidents()
     except Exception as e:
-        dd.close()
         return {"infrastructure_coverage": {"score": 0, "findings": [f"Datadog query failed: {e}"]}}
 
     data["infrastructure_coverage"] = {
@@ -74,7 +73,6 @@ def _collect_datadog_data(tags: str | None = None) -> dict[str, Any]:
     }
     data["automation_self_healing"] = {"score": 10, "findings": ["Self-healing not yet configured"]}
 
-    dd.close()
     return data
 
 

@@ -44,7 +44,10 @@ async def analyze_health(
                 .limit(1)
             )
         ).scalar_one_or_none()
-        current = snap.current_value if snap else slo.target * 1.05
+        if snap and snap.current_value is not None:
+            current = snap.current_value
+        else:
+            current = slo.target * 1.05
         if current < slo.target * 0.9:
             slos_violated += 1
             findings.append(

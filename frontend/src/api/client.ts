@@ -1,9 +1,31 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 const API_BASE = "/api/v1";
+const TOKEN_KEY = "observai_token";
+
+export function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setToken(token: string): void {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+export function clearToken(): void {
+  localStorage.removeItem(TOKEN_KEY);
+}
 
 async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${url}`, options);
+  const token = getToken();
+  const headers = new Headers(options?.headers);
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+
+  const res = await fetch(`${API_BASE}${url}`, { ...options, headers });
+  if (res.status === 401) {
+    clearToken();
+    throw new Error("Session expired. Please sign in again.");
+  }
   if (!res.ok) {
     throw new Error(`API error: ${res.status} ${res.statusText}`);
   }
@@ -12,10 +34,56 @@ async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
 
 // Generic API helper (used by Maturity/Reports pages)
 export async function api<T = unknown>(url: string, options?: RequestInit): Promise<T> {
-  return fetchJSON<T>(url, {
+  return fetchJSON<T>(url, options);
+}
+
+// ─── Auth ────────────────────────────────────────────────
+
+export interface UserInfo {
+  username: string;
+  role: string;
+}
+
+export async function login(username: string, password: string): Promise<UserInfo> {
+  const res = await fetch(`${API_BASE}/auth/login`, {
+    method: "POST",
     headers: { "Content-Type": "application/json" },
-    ...options,
+    body: JSON.stringify({ username, password }),
   });
+  if (!res.ok) {
+    throw new Error("Invalid credentials");
+  }
+  const data = (await res.json()) as { access_token: string };
+  setToken(data.access_token);
+  return me();
+}
+
+export async function logout(): Promise<void> {
+  const token = getToken();
+  if (token) {
+    try {
+      await fetch(`${API_BASE}/auth/logout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch {
+      // ignore network errors during logout
+    }
+  }
+  clearToken();
+}
+
+export async function me(): Promise<UserInfo> {
+  const token = getToken();
+  if (!token) throw new Error("Not authenticated");
+  const res = await fetch(`${API_BASE}/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    clearToken();
+    throw new Error("Not authenticated");
+  }
+  return res.json() as Promise<UserInfo>;
 }
 
 // ─── Monitors ────────────────────────────────────────────
@@ -68,8 +136,12 @@ export function useDdLogs(filters?: { query?: string; limit?: number; tags?: str
 
   return useQuery<DdLog[]>({
     queryKey: ["dd-logs", filters],
-    queryFn: () => fetchJSON(`/datadog/logs?${params}`),
-    enabled: !!(filters?.query || filters?.tags),
+      queryFn: async () => {
+        const res = await fetchJSON<unknown>(`/datadog/logs?${params}`);
+        if (Array.isArray(res)) return res as DdLog[];
+        return (res as { data?: DdLog[] }).data ?? [];
+      },
+      enabled: !!(filters?.query || filters?.tags),
     refetchInterval: 30_000,
   });
 }
