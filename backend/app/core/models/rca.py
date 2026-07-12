@@ -2,7 +2,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, Text
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -27,6 +27,10 @@ class RcaReport(Base):
     recommendations = Column(JSON, nullable=True)
     similar_incidents = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    # Resolution tracking
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    resolution_summary = Column(Text, nullable=True)
+    resolution_verified = Column(String(10), nullable=True)
 
     # Relationships
     embeddings = relationship("IncidentEmbedding", back_populates="rca_report")

@@ -50,6 +50,10 @@ class IncidentEmbedding(Base):
         default=lambda: datetime.now(UTC),
         onupdate=lambda: datetime.now(UTC),
     )
+    # Resolution feedback fields
+    resolution_verified = Column(String(10), nullable=True)  # boolean as string for flexibility
+    resolution_summary = Column(Text, nullable=True)
+    remediation_effective = Column(String(10), nullable=True)
 
     incident = relationship("Incident", back_populates="embedding")
     rca_report = relationship("RcaReport", back_populates="embeddings")

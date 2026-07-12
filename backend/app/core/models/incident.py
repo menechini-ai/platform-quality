@@ -26,6 +26,8 @@ class Incident(Base):
     tags = Column(JSON, nullable=True, default=list)
     started_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
     resolved_at = Column(DateTime(timezone=True), nullable=True)
+    resolved = Column(String(10), nullable=True)  # boolean as string
+    resolution_summary = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     updated_at = Column(
         DateTime(timezone=True),

@@ -54,6 +54,7 @@ def create_app() -> FastAPI:
     from app.datadog_routes.rum import router as rum_router
     from app.datadog_routes.slos import router as slos_router
     from app.datadog_routes.synthetics import router as synthetics_router
+    from app.datadog_kit.feedback import router as feedback_router
     from app.health.router import router as health_router
     from app.incidents.router import router as incidents_router
     from app.knowledge_base.router import router as kb_router
@@ -85,6 +86,7 @@ def create_app() -> FastAPI:
     app.include_router(kb_router, prefix=prefix, tags=["knowledge-base"])
     app.include_router(analysis_router, prefix=prefix, tags=["analysis"])
     app.include_router(datadog_kit_router, prefix=prefix, tags=["datadog-investigate"])
+    app.include_router(feedback_router, prefix=prefix, tags=["feedback"])
 
     @app.get("/health")
     async def health_check():
