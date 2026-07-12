@@ -24,9 +24,6 @@ from datadog_api_client.v1.api.events_api import EventsApi
 from datadog_api_client.v1.api.metrics_api import MetricsApi
 from datadog_api_client.v1.api.monitors_api import MonitorsApi
 from datadog_api_client.v1.api.service_level_objectives_api import ServiceLevelObjectivesApi
-from datadog_api_client.v1.model.slo_threshold import SLOThreshold
-from datadog_api_client.v1.model.slo_timeframe import SLOTimeframe
-from datadog_api_client.v1.model.slo_type import SLOType
 from datadog_api_client.v2.api.incidents_api import IncidentsApi
 from datadog_api_client.v2.api.logs_api import LogsApi
 from datadog_api_client.v2.api.spans_api import SpansApi
@@ -73,7 +70,6 @@ class DatadogClient:
         config.api_key["apiKeyAuth"] = settings.DATADOG_API_KEY
         config.api_key["appKeyAuth"] = settings.DATADOG_APP_KEY
         config.server_variables["site"] = settings.DATADOG_SITE
-        config.unstable_operations["use_v2_metrics"] = True
 
         self._client = ApiClient(config)
 
@@ -119,10 +115,10 @@ class DatadogClient:
         return response.to_dict()
 
     # V1 Monitors
-    def list_monitors(self, **kwargs: Any) -> dict[str, Any]:
+    def list_monitors(self, **kwargs: Any) -> list[dict[str, Any]]:
         """List all monitors."""
         response = self.monitors.list_monitors(**kwargs)
-        return response.to_dict()
+        return [m.to_dict() for m in response]
 
     def get_monitor(self, monitor_id: int, **kwargs: Any) -> dict[str, Any]:
         """Get a single monitor by ID."""
@@ -191,7 +187,6 @@ class DatadogClient:
             LogsListRequestPage,
         )
         from datadog_api_client.v2.model.logs_query_filter import LogsQueryFilter
-        from datadog_api_client.v2.model.logs_sort import LogsSort
 
         filt = LogsQueryFilter(query=query)
         page = LogsListRequestPage()
