@@ -6,24 +6,21 @@ import asyncio
 import logging
 import time
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
 
 from app.datadog.client import DatadogClient
 from app.datadog_kit.config import DatadogKitConfig
 from app.datadog_kit.models import (
     EventEntry,
-    InvestigationResult,
-    InvestigationRequest,
-    LogEntry,
-    MetricsResult,
-    MetricSeries,
-    LogsResult,
     EventsResult,
+    InvestigationRequest,
+    InvestigationResult,
+    LogEntry,
+    LogsResult,
+    MetricSeries,
+    MetricsResult,
+    MonitorEntry,
     MonitorsResult,
 )
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +103,11 @@ async def _get_events(
                     source=ev.get("source", ""),
                 )
             )
-        return EventsResult(events=events[: config.events_limit], total=len(events), duration_ms=duration)
+        return EventsResult(
+            events=events[: config.events_limit],
+            total=len(events),
+            duration_ms=duration,
+        )
     except Exception as exc:
         duration = int((time.monotonic() - t0) * 1000)
         logger.warning("[datadog_kit] get_events failed: %s", exc)
