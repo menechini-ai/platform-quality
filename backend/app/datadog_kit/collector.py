@@ -1,4 +1,5 @@
 """Parallel signal collector — fetches logs, events, monitors, metrics concurrently."""
+
 from __future__ import annotations
 
 import asyncio
@@ -216,7 +217,7 @@ async def _query_metrics(
         for mq in metric_queries:
             raw = await client.call(client.query_metrics, query=mq, from_ts=start_ts, to_ts=end_ts)
             data = raw if isinstance(raw, dict) else {}
-            for s in (data.get("series") or []):
+            for s in data.get("series") or []:
                 if isinstance(s, dict):
                     pts = s.get("pointlist") or []
                     filtered = [
@@ -314,15 +315,19 @@ async def fetch_all(
     metrics_task = _query_metrics(client, request, cfg, ctx)
     spans_task = _search_spans(client, request, cfg, ctx)
 
-    logs_result, events_result, monitors_result, metrics_result, spans_result = (
-        await asyncio.gather(
-            logs_task,
-            events_task,
-            monitors_task,
-            metrics_task,
-            spans_task,
-            return_exceptions=False,
-        )
+    (
+        logs_result,
+        events_result,
+        monitors_result,
+        metrics_result,
+        spans_result,
+    ) = await asyncio.gather(
+        logs_task,
+        events_task,
+        monitors_task,
+        metrics_task,
+        spans_task,
+        return_exceptions=False,
     )
 
     total_duration = int((time.monotonic() - t0) * 1000)

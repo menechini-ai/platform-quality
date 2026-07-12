@@ -1,4 +1,5 @@
 """Embedding service for incident vector similarity search."""
+
 from __future__ import annotations
 
 import logging

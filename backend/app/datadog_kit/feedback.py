@@ -1,4 +1,5 @@
 """Feedback API for marking resolution and updating embeddings."""
+
 from __future__ import annotations
 
 import logging
@@ -26,6 +27,7 @@ router = APIRouter(prefix="/feedback", tags=["feedback"])
 
 class ResolutionFeedback(BaseModel):
     """Resolution feedback for an investigation."""
+
     report_id: str
     resolved: bool = True
     resolution_summary: str = Field(..., min_length=10, max_length=2000)
@@ -39,6 +41,7 @@ class ResolutionFeedback(BaseModel):
 
 class ResolutionResponse(BaseModel):
     """Response after submitting resolution feedback."""
+
     success: bool
     report_id: str
     incident_id: str | None = None
@@ -48,6 +51,7 @@ class ResolutionResponse(BaseModel):
 
 class IncidentFeedback(BaseModel):
     """Direct incident feedback (without investigation report)."""
+
     incident_id: str
     title: str
     service: str | None = None
@@ -87,7 +91,7 @@ async def submit_resolution(
     # Update report with resolution
     report.resolved_at = datetime.now(UTC)
     report.resolution_summary = feedback.resolution_summary
-    report.resolution_verified = feedback.root_cause_verified
+    report.resolution_verified = "true" if feedback.root_cause_verified else "false"
     if feedback.actual_root_cause:
         report.root_cause = feedback.actual_root_cause
     if feedback.actual_category:
@@ -111,7 +115,9 @@ async def submit_resolution(
     embedding_updated = False
     if incident_id:
         try:
-            inc_result = await db.execute(select(Incident).where(Incident.id == uuid.UUID(incident_id)))
+            inc_result = await db.execute(
+                select(Incident).where(Incident.id == uuid.UUID(incident_id))
+            )
             incident = inc_result.scalar_one_or_none()
 
             if incident:
@@ -126,13 +132,20 @@ async def submit_resolution(
 
                 # Build updated diagnosis for embedding
                 diagnosis = RcaDiagnosis(
-                    root_cause=feedback.actual_root_cause or report.root_cause,
-                    root_cause_category=feedback.actual_category or (report.timeline or {}).get("category", "unknown"),
+                    root_cause=feedback.actual_root_cause or report.root_cause or "unknown",
+                    root_cause_category=feedback.actual_category
+                    or (report.timeline or {}).get("category", "unknown"),
                     causal_chain=(report.timeline or {}).get("causal_chain", []),
                     severity=(report.timeline or {}).get("severity", "P3"),
                     confidence=0.95,  # high confidence after human verification
                     evidence_refs=report.changes or {},
-                    remediation_steps=feedback.remediation_taken or report.recommendations or [],
+                    remediation_steps=feedback.remediation_taken
+                    or (
+                        []
+                        if not isinstance(report.recommendations, list)
+                        else report.recommendations
+                    )
+                    or [],
                     inconclusive=False,
                 )
 
@@ -142,9 +155,13 @@ async def submit_resolution(
                     diagnosis=diagnosis,
                 )
                 if embedding:
-                    embedding.resolution_verified = True
+                    embedding.resolution_verified = (
+                        "true" if feedback.root_cause_verified else "false"
+                    )
                     embedding.resolution_summary = feedback.resolution_summary
-                    embedding.remediation_effective = feedback.root_cause_verified
+                    embedding.remediation_effective = (
+                        "true" if feedback.root_cause_verified else "false"
+                    )
                     await db.commit()
                     embedding_updated = True
                     logger.info("Updated embedding for incident %s with resolution", incident_id)
@@ -221,7 +238,9 @@ async def submit_incident_feedback(
         report_id="",
         incident_id=feedback.incident_id,
         embedding_updated=embedding is not None,
-        message="Incident feedback recorded and embedding created" if embedding else "Incident recorded (embedding failed)",
+        message="Incident feedback recorded and embedding created"
+        if embedding
+        else "Incident recorded (embedding failed)",
     )
 
 
@@ -280,7 +299,9 @@ async def get_incident_embedding_status(
         "incident_id": incident_id,
         "has_embedding": True,
         "embedding_id": str(embedding.id),
-        "source_text": embedding.source_text[:200] + "..." if len(embedding.source_text) > 200 else embedding.source_text,
+        "source_text": embedding.source_text[:200] + "..."
+        if len(embedding.source_text) > 200
+        else embedding.source_text,
         "root_cause_category": embedding.root_cause_category,
         "severity": embedding.severity,
         "service": embedding.service,

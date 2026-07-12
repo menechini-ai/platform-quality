@@ -1,8 +1,9 @@
 """RCA report model."""
+
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, JSON, String, Text
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -26,7 +27,7 @@ class RcaReport(Base):
     metrics_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     logs_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     changes: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    recommendations: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    recommendations: Mapped[list[str] | dict | None] = mapped_column(JSON, nullable=True)
     similar_incidents: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
@@ -36,7 +37,9 @@ class RcaReport(Base):
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     resolution_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     resolution_verified: Mapped[str | None] = mapped_column(String(10), nullable=True)
-    resolution_outcome: Mapped[str | None] = mapped_column(String(50), nullable=True)  # auto, manual, partial
+    resolution_outcome: Mapped[str | None] = mapped_column(
+        String(50), nullable=True
+    )  # auto, manual, partial
     resolution_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     resolved_by: Mapped[str | None] = mapped_column(String(200), nullable=True)
 

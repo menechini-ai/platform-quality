@@ -1,4 +1,5 @@
 """ReAct Agent for iterative Datadog investigation."""
+
 from __future__ import annotations
 
 import json
@@ -94,7 +95,8 @@ async def _execute_tool(name: str, params: dict[str, Any]) -> str:
             logs = data.get("data", [])
             count = len(logs)
             errors = [
-                lg for lg in logs
+                lg
+                for lg in logs
                 if lg.get("attributes", {}).get("status", "").lower()
                 in ("error", "critical", "fatal")
             ]
@@ -132,9 +134,9 @@ async def _execute_tool(name: str, params: dict[str, Any]) -> str:
         if name == "fetch_metrics":
             now_ts = int(datetime.now(UTC).timestamp())
             start_ts = int(
-                (datetime.now(UTC) - timedelta(
-                    minutes=params.get("time_range_minutes", 60)
-                )).timestamp()
+                (
+                    datetime.now(UTC) - timedelta(minutes=params.get("time_range_minutes", 60))
+                ).timestamp()
             )
             raw = await client.call(
                 client.query_metrics,
@@ -164,9 +166,9 @@ async def _execute_tool(name: str, params: dict[str, Any]) -> str:
 
         if name == "fetch_events":
             start = int(
-                (datetime.now(UTC) - timedelta(
-                    minutes=params.get("time_range_minutes", 60)
-                )).timestamp()
+                (
+                    datetime.now(UTC) - timedelta(minutes=params.get("time_range_minutes", 60))
+                ).timestamp()
             )
             end = int(datetime.now(UTC).timestamp())
             raw = await client.call(
@@ -175,8 +177,8 @@ async def _execute_tool(name: str, params: dict[str, Any]) -> str:
                 end=end,
                 tags=params.get("query", ""),
             )
-            data = raw.to_dict() if hasattr(raw, "to_dict") else (
-                raw if isinstance(raw, dict) else {}
+            data = (
+                raw.to_dict() if hasattr(raw, "to_dict") else (raw if isinstance(raw, dict) else {})
             )
             events = data.get("events", [])
             titles = [e.get("title") for e in events[:5]]
@@ -184,8 +186,7 @@ async def _execute_tool(name: str, params: dict[str, Any]) -> str:
 
         if name == "search_incidents":
             raw = await client.call(
-                client.incidents.list_incidents,
-                filter_query=params.get("query", "")
+                client.incidents.list_incidents, filter_query=params.get("query", "")
             )
             data = raw if isinstance(raw, dict) else {}
             incidents = data.get("data", [])
@@ -194,8 +195,7 @@ async def _execute_tool(name: str, params: dict[str, Any]) -> str:
 
         if name == "get_incident":
             raw = await client.call(
-                client.incidents.get_incident,
-                incident_id=params["incident_id"]
+                client.incidents.get_incident, incident_id=params["incident_id"]
             )
             data = raw if isinstance(raw, dict) else {}
             inc = data.get("data", {})
@@ -210,23 +210,21 @@ async def _execute_tool(name: str, params: dict[str, Any]) -> str:
 
 def _build_context_summary(result: InvestigationResult) -> str:
     """Build compact context summary."""
-    error_count = len([
-        lg for lg in result.logs.logs
-        if lg.status.lower() in ("error", "critical", "fatal")
-    ])
-    alert_count = len([
-        m for m in result.monitors.monitors
-        if m.overall_state in ("Alert", "Warn")
-    ])
-    return "\n".join([
-        f"Query: {result.query}",
-        f"Time range: {result.time_range_minutes}min",
-        f"Logs: {result.logs.total} ({error_count} errors)",
-        f"Monitors: {result.monitors.total} ({alert_count} alerting)",
-        f"Spans: {result.spans.total}",
-        f"Metrics series: {result.metrics.total}",
-        f"Events: {result.events.total}",
-    ])
+    error_count = len(
+        [lg for lg in result.logs.logs if lg.status.lower() in ("error", "critical", "fatal")]
+    )
+    alert_count = len([m for m in result.monitors.monitors if m.overall_state in ("Alert", "Warn")])
+    return "\n".join(
+        [
+            f"Query: {result.query}",
+            f"Time range: {result.time_range_minutes}min",
+            f"Logs: {result.logs.total} ({error_count} errors)",
+            f"Monitors: {result.monitors.total} ({alert_count} alerting)",
+            f"Spans: {result.spans.total}",
+            f"Metrics series: {result.metrics.total}",
+            f"Events: {result.events.total}",
+        ]
+    )
 
 
 async def _build_runbook(diagnosis: Any, incident_ids: list[str]) -> Runbook:
@@ -294,6 +292,21 @@ async def investigate_react(request: InvestigationRequestV3) -> InvestigationRes
 
     trace: list[ReActTurn] = []
 
+    diagnosis = _parse_rca_response(
+        json.dumps(
+            {
+                "root_cause": "Investigation did not produce a diagnosis",
+                "root_cause_category": "dependency",
+                "causal_chain": [],
+                "severity": "P3",
+                "confidence": 0.0,
+                "evidence_refs": {},
+                "remediation_steps": [],
+                "inconclusive": True,
+            }
+        )
+    )
+
     for _turn in range(1, request.max_turns + 1):
         context_summary = _build_context_summary(context)
         msg = f"Investigation: {request.query}\nData:\n{context_summary}"
@@ -305,12 +318,19 @@ async def investigate_react(request: InvestigationRequestV3) -> InvestigationRes
         ]
 
         for t in trace:
-            messages.append({"role": "assistant", "content": json.dumps({
-                "thought": t.thought,
-                "action": t.action,
-                "action_input": t.action_input,
-                "final_answer": False,
-            })})
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": json.dumps(
+                        {
+                            "thought": t.thought,
+                            "action": t.action,
+                            "action_input": t.action_input,
+                            "final_answer": False,
+                        }
+                    ),
+                }
+            )
             messages.append({"role": "user", "content": t.observation})
 
         if not settings.OPENAI_API_KEY:
@@ -339,25 +359,31 @@ async def investigate_react(request: InvestigationRequestV3) -> InvestigationRes
         # Execute tool
         observation = await _execute_tool(action, action_input)
 
-        trace.append(ReActTurn(
-            turn=_turn,
-            thought=thought,
-            action=action,
-            action_input=action_input,
-            observation=observation,
-        ))
+        trace.append(
+            ReActTurn(
+                turn=_turn,
+                thought=thought,
+                action=action,
+                action_input=action_input,
+                observation=observation,
+            )
+        )
     else:
         # Max turns reached without conclusion
-        diagnosis = _parse_rca_response(json.dumps({
-            "root_cause": "Max turns reached without conclusion",
-            "root_cause_category": "dependency",
-            "causal_chain": [t.thought for t in trace],
-            "severity": "P3",
-            "confidence": 0.3,
-            "evidence_refs": {},
-            "remediation_steps": ["Re-run with more turns or manual investigation"],
-            "inconclusive": True,
-        }))
+        diagnosis = _parse_rca_response(
+            json.dumps(
+                {
+                    "root_cause": "Max turns reached without conclusion",
+                    "root_cause_category": "dependency",
+                    "causal_chain": [t.thought for t in trace],
+                    "severity": "P3",
+                    "confidence": 0.3,
+                    "evidence_refs": {},
+                    "remediation_steps": ["Re-run with more turns or manual investigation"],
+                    "inconclusive": True,
+                }
+            )
+        )
 
     # Build enhanced result
     runbook = None

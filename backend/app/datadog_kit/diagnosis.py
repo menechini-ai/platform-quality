@@ -1,4 +1,5 @@
 """LLM-powered RCA diagnosis from collected investigation data."""
+
 from __future__ import annotations
 
 import json
@@ -58,8 +59,7 @@ def _summarize_logs(result: InvestigationResult) -> str:
     errors = [log for log in logs if log.status.lower() in ("error", "critical", "fatal")]
     if errors:
         lines = [
-            f"[{e.timestamp}] {e.service} | {e.status} | {e.message[:200]}"
-            for e in errors[:15]
+            f"[{e.timestamp}] {e.service} | {e.status} | {e.message[:200]}" for e in errors[:15]
         ]
         return f"{len(errors)} error logs (showing {len(lines)}):\n" + "\n".join(lines)
     return f"{len(logs)} logs captured, no errors detected."
@@ -136,7 +136,8 @@ def _parse_rca_response(raw: str) -> RcaDiagnosis:
     except json.JSONDecodeError as e:
         # Try to extract first {...} balanced object
         import re
-        match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', text, re.DOTALL)
+
+        match = re.search(r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}", text, re.DOTALL)
         if match:
             data = json.loads(match.group())
         else:
@@ -201,12 +202,14 @@ async def _call_openai(prompt: str) -> str:
         raw = resp.text
         # Parse outer envelope
         import json
+
         try:
             data = json.loads(raw)
         except json.JSONDecodeError:
             # Try to extract first {...}
             import re
-            match = re.search(r'\{.*\}', raw, re.DOTALL)
+
+            match = re.search(r"\{.*\}", raw, re.DOTALL)
             if match:
                 data = json.loads(match.group())
             else:
@@ -266,8 +269,7 @@ def _fallback_diagnosis(result: InvestigationResult) -> RcaDiagnosis:
 
     return RcaDiagnosis(
         root_cause=(
-            f"{error_count} error logs, {alerts_count} monitors alerting,"
-            f" {event_count} events"
+            f"{error_count} error logs, {alerts_count} monitors alerting, {event_count} events"
         ),
         root_cause_category="resource",
         causal_chain=[],

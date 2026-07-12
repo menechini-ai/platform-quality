@@ -1,4 +1,5 @@
 """Global configuration via pydantic-settings."""
+
 from typing import Literal
 
 from pydantic import field_validator
@@ -105,8 +106,6 @@ class Settings(BaseSettings):
     CANARY_ENABLED: bool = False
 
     # --- LLM / AI ---
-    OPENAI_API_KEY: str | None = None
-    OPENAI_BASE_URL: str | None = None
     EMBED_MODEL: str = "text-embedding-3-small"
     LITELLM_API_KEY: str | None = None
     LITELLM_BASE_URL: str | None = None

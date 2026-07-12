@@ -1,7 +1,8 @@
 """Pydantic models for the Datadog investigation kit."""
+
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime  # noqa: TC003 -- runtime need: Pydantic field type
 from typing import Any, Literal
 
 from pydantic import BaseModel
@@ -98,6 +99,10 @@ class InvestigationResult(BaseModel):
     metrics: MetricsResult = MetricsResult()
     spans: SpansResult = SpansResult()
     total_duration_ms: int = 0
+    diagnosis: RcaDiagnosis | None = None
+    react_trace: list[ReActTurn] = []
+    runbook: Runbook | None = None
+    mttr_breakdown: MttrBreakdown | None = None
 
 
 class RcaDiagnosis(BaseModel):

@@ -17,21 +17,19 @@ from app.datadog_kit.agent import investigate_react
 from app.datadog_kit.collector import fetch_all
 from app.datadog_kit.config import DatadogKitConfig
 from app.datadog_kit.diagnosis import analyze
-from app.datadog_kit.embeddings import get_similar_incidents_context, search_similar_incidents
+from app.datadog_kit.embeddings import search_similar_incidents
 from app.datadog_kit.models import InvestigationRequest, InvestigationRequestV3  # noqa: TC001
-from app.datadog_kit.playbook_executor import (
-    PlaybookExecutor,
-    PlaybookStep,
-    StepType,
-    build_playbook_from_runbook,
-)
 from app.datadog_kit.notifications import (
     NotificationChannel,
     NotificationDispatcher,
     NotificationPayload,
-    NotificationPriority,
     build_incident_notification,
     build_playbook_notification,
+)
+from app.datadog_kit.playbook_executor import (
+    PlaybookExecutor,
+    PlaybookStep,
+    build_playbook_from_runbook,
 )
 
 if TYPE_CHECKING:
@@ -44,9 +42,11 @@ router = APIRouter(prefix="/datadog", tags=["datadog-investigate"])
 
 def check_feature_enabled(feature: str):
     """Dependency to check if a V4 feature is enabled."""
+
     def _check():
         if not getattr(settings, feature, True):
             raise HTTPException(status_code=503, detail=f"Feature {feature} is disabled")
+
     return Depends(_check)
 
 
@@ -164,9 +164,9 @@ async def investigate_v3(
             "confidence": result.diagnosis.confidence if result.diagnosis else 0.0,
             "inconclusive": result.diagnosis.inconclusive if result.diagnosis else True,
             "category": result.diagnosis.root_cause_category if result.diagnosis else "dependency",
-            "react_trace": [
-                t.model_dump() for t in result.react_trace
-            ] if result.react_trace else [],
+            "react_trace": [t.model_dump() for t in result.react_trace]
+            if result.react_trace
+            else [],
             "runbook": result.runbook.model_dump() if result.runbook else None,
             "mttr_breakdown": (
                 result.mttr_breakdown.model_dump() if result.mttr_breakdown else None
@@ -244,7 +244,8 @@ async def execute_playbook_steps(
     Body: {
         "steps": [
             {
-                "type": "kubectl|helm|scale_deployment|restart_deployment|flip_feature_flag|run_script|http_request",
+                "type": "kubectl|helm|scale_deployment|restart_deployment|"
+                        "flip_feature_flag|run_script|http_request",
                 "name": "step name",
                 "params": {...},
                 "requires_confirmation": true
@@ -415,9 +416,10 @@ async def get_similar_incidents(
         raise HTTPException(status_code=400, detail="Invalid incident ID") from None
 
     # Get the incident's embedding text
+    from sqlalchemy import select
+
     from app.core.models.incident import Incident
     from app.core.models.incident_embedding import IncidentEmbedding
-    from sqlalchemy import select
 
     result = await db.execute(
         select(IncidentEmbedding)
@@ -442,7 +444,9 @@ async def get_similar_incidents(
             {
                 "incident_id": str(e.incident_id),
                 "rca_report_id": str(e.rca_report_id) if e.rca_report_id else None,
-                "summary": e.source_text[:200] + "..." if len(e.source_text) > 200 else e.source_text,
+                "summary": e.source_text[:200] + "..."
+                if len(e.source_text) > 200
+                else e.source_text,
                 "root_cause_category": e.root_cause_category,
                 "severity": e.severity,
                 "service": e.service,

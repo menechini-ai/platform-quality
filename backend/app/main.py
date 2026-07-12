@@ -68,6 +68,7 @@ def create_app() -> FastAPI:
     from app.agents.router import router as agents_router
     from app.analysis.router import router as analysis_router
     from app.auth.router import router as auth_router
+    from app.datadog_kit.feedback import router as feedback_router
     from app.datadog_kit.router import router as datadog_kit_router
     from app.datadog_routes.apm import router as apm_router
     from app.datadog_routes.error_tracking import router as error_tracking_router
@@ -81,7 +82,6 @@ def create_app() -> FastAPI:
     from app.datadog_routes.rum import router as rum_router
     from app.datadog_routes.slos import router as slos_router
     from app.datadog_routes.synthetics import router as synthetics_router
-    from app.datadog_kit.feedback import router as feedback_router
     from app.health.router import router as health_router
     from app.incidents.router import router as incidents_router
     from app.knowledge_base.router import router as kb_router

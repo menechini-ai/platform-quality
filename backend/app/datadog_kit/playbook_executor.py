@@ -1,4 +1,5 @@
 """Playbook executor for automated remediation."""
+
 from __future__ import annotations
 
 import logging
@@ -6,9 +7,12 @@ import subprocess
 import time
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from app.core.config import settings
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +38,7 @@ class StepStatus(StrEnum):
 @dataclass
 class PlaybookStep:
     """Single executable step in a playbook."""
+
     type: StepType
     name: str
     params: dict[str, Any]
@@ -46,6 +51,7 @@ class PlaybookStep:
 @dataclass
 class StepResult:
     """Result of executing a step."""
+
     step_name: str
     status: StepStatus
     output: str = ""
@@ -57,6 +63,7 @@ class StepResult:
 @dataclass
 class PlaybookExecution:
     """Full playbook execution result."""
+
     playbook_title: str
     steps: list[StepResult] = field(default_factory=list)
     overall_status: StepStatus = StepStatus.PENDING
@@ -79,7 +86,7 @@ class PlaybookExecutor:
     async def execute(
         self,
         steps: list[PlaybookStep],
-        confirm_callback: callable | None = None,
+        confirm_callback: Callable | None = None,
     ) -> PlaybookExecution:
         """Execute all steps in sequence."""
         execution = PlaybookExecution(
@@ -256,6 +263,7 @@ class PlaybookExecutor:
 
     async def _http_request(self, params: dict[str, Any]) -> str:
         import httpx
+
         method = params.get("method", "POST")
         url = params["url"]
         headers = params.get("headers", {})
@@ -277,6 +285,7 @@ class PlaybookExecutor:
 
 def _import_os_environ() -> dict[str, str]:
     import os
+
     return dict(os.environ)
 
 
@@ -290,25 +299,35 @@ def build_playbook_from_runbook(runbook: Any) -> list[PlaybookStep]:
     for mitigation in runbook.mitigation:
         # Simple mapping - in reality you'd parse structured mitigation steps
         if "restart" in mitigation.lower():
-            steps.append(PlaybookStep(
-                type=StepType.RESTART_DEPLOYMENT,
-                name=f"Restart: {mitigation[:50]}",
-                params={"name": "TODO-extract-deployment-name", "namespace": "default"},
-                requires_confirmation=True,
-            ))
+            steps.append(
+                PlaybookStep(
+                    type=StepType.RESTART_DEPLOYMENT,
+                    name=f"Restart: {mitigation[:50]}",
+                    params={"name": "TODO-extract-deployment-name", "namespace": "default"},
+                    requires_confirmation=True,
+                )
+            )
         elif "scale" in mitigation.lower():
-            steps.append(PlaybookStep(
-                type=StepType.SCALE_DEPLOYMENT,
-                name=f"Scale: {mitigation[:50]}",
-                params={"name": "TODO-extract-deployment-name", "namespace": "default", "replicas": 3},
-                requires_confirmation=True,
-            ))
+            steps.append(
+                PlaybookStep(
+                    type=StepType.SCALE_DEPLOYMENT,
+                    name=f"Scale: {mitigation[:50]}",
+                    params={
+                        "name": "TODO-extract-deployment-name",
+                        "namespace": "default",
+                        "replicas": 3,
+                    },
+                    requires_confirmation=True,
+                )
+            )
         elif "flag" in mitigation.lower() or "feature" in mitigation.lower():
-            steps.append(PlaybookStep(
-                type=StepType.FLIP_FEATURE_FLAG,
-                name=f"Feature flag: {mitigation[:50]}",
-                params={"flag": "TODO-extract-flag-name", "enabled": False},
-                requires_confirmation=True,
-            ))
+            steps.append(
+                PlaybookStep(
+                    type=StepType.FLIP_FEATURE_FLAG,
+                    name=f"Feature flag: {mitigation[:50]}",
+                    params={"flag": "TODO-extract-flag-name", "enabled": False},
+                    requires_confirmation=True,
+                )
+            )
 
     return steps

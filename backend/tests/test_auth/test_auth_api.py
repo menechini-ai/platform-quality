@@ -81,7 +81,9 @@ class TestLogin:
         assert len(body["access_token"]) > 20
 
     @pytest.mark.asyncio
-    async def test_login_invalid_password(self, noauth_client: AsyncClient, db_session: AsyncSession):
+    async def test_login_invalid_password(
+        self, noauth_client: AsyncClient, db_session: AsyncSession
+    ):
         from app.auth.service import UserService
 
         await UserService.create_user(db_session, "admin", "admin")

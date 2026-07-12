@@ -1,4 +1,5 @@
 """Notification dispatcher for Slack, Telegram, PagerDuty."""
+
 from __future__ import annotations
 
 import logging
@@ -31,6 +32,7 @@ class NotificationPriority(StrEnum):
 @dataclass
 class NotificationPayload:
     """Structured notification payload."""
+
     title: str
     message: str
     priority: NotificationPriority = NotificationPriority.NORMAL
@@ -45,6 +47,7 @@ class NotificationPayload:
 @dataclass
 class NotificationResult:
     """Result of sending a notification."""
+
     channel: NotificationChannel
     success: bool
     message: str = ""
@@ -68,7 +71,12 @@ class NotificationChannelBase(ABC):
 class SlackNotifier(NotificationChannelBase):
     """Slack webhook/bot notifier."""
 
-    def __init__(self, webhook_url: str | None = None, bot_token: str | None = None, default_channel: str | None = None):
+    def __init__(
+        self,
+        webhook_url: str | None = None,
+        bot_token: str | None = None,
+        default_channel: str | None = None,
+    ):
         self.webhook_url = webhook_url or settings.SLACK_WEBHOOK_URL
         self.bot_token = bot_token or settings.SLACK_BOT_TOKEN
         self.default_channel = default_channel or settings.SLACK_DEFAULT_CHANNEL
@@ -99,7 +107,10 @@ class SlackNotifier(NotificationChannelBase):
                     "type": "header",
                     "text": {
                         "type": "plain_text",
-                        "text": f"🚨 {payload.title}" if payload.priority in (NotificationPriority.HIGH, NotificationPriority.CRITICAL) else f"ℹ️ {payload.title}",
+                        "text": f"🚨 {payload.title}"
+                        if payload.priority
+                        in (NotificationPriority.HIGH, NotificationPriority.CRITICAL)
+                        else f"ℹ️ {payload.title}",
                     },
                 },
                 {
@@ -110,17 +121,25 @@ class SlackNotifier(NotificationChannelBase):
 
             if payload.fields:
                 fields = [
-                    {"type": "mrkdwn", "text": f"*{k}*:\n{v}"}
-                    for k, v in payload.fields.items()
+                    {"type": "mrkdwn", "text": f"*{k}*:\n{v}"} for k, v in payload.fields.items()
                 ]
                 blocks.append({"type": "section", "fields": fields})
 
             if payload.links:
                 link_text = " | ".join(f"<{url}|{name}>" for name, url in payload.links.items())
-                blocks.append({"type": "context", "elements": [{"type": "mrkdwn", "text": link_text}]})
+                blocks.append(
+                    {"type": "context", "elements": [{"type": "mrkdwn", "text": link_text}]}
+                )
 
             if payload.tags:
-                blocks.append({"type": "context", "elements": [{"type": "mrkdwn", "text": " ".join(f"`{t}`" for t in payload.tags)}]})
+                blocks.append(
+                    {
+                        "type": "context",
+                        "elements": [
+                            {"type": "mrkdwn", "text": " ".join(f"`{t}`" for t in payload.tags)}
+                        ],
+                    }
+                )
 
             msg = {
                 "blocks": blocks,
@@ -134,7 +153,10 @@ class SlackNotifier(NotificationChannelBase):
                 if self.bot_token:
                     resp = await client.post(
                         "https://slack.com/api/chat.postMessage",
-                        headers={"Authorization": f"Bearer {self.bot_token}", "Content-Type": "application/json"},
+                        headers={
+                            "Authorization": f"Bearer {self.bot_token}",
+                            "Content-Type": "application/json",
+                        },
                         json=msg,
                     )
                     data = resp.json()
@@ -146,7 +168,7 @@ class SlackNotifier(NotificationChannelBase):
                         external_id=data.get("ts"),
                     )
                 else:
-                    resp = await client.post(self.webhook_url, json=msg)
+                    resp = await client.post(self.webhook_url or "", json=msg)
                     resp.raise_for_status()
                     return NotificationResult(channel=self.channel, success=True)
 
@@ -317,11 +339,13 @@ class NotificationDispatcher:
         for ch in target_channels:
             notifier = self.channels.get(ch)
             if not notifier:
-                results.append(NotificationResult(
-                    channel=ch,
-                    success=False,
-                    error=f"Channel {ch.value} not configured",
-                ))
+                results.append(
+                    NotificationResult(
+                        channel=ch,
+                        success=False,
+                        error=f"Channel {ch.value} not configured",
+                    )
+                )
                 continue
             result = await notifier.send(payload)
             results.append(result)
@@ -343,7 +367,12 @@ def build_incident_notification(
     causal_chain = diagnosis.get("causal_chain", [])
     remediation = diagnosis.get("remediation_steps", [])
 
-    priority_map = {"P1": NotificationPriority.CRITICAL, "P2": NotificationPriority.HIGH, "P3": NotificationPriority.NORMAL, "P4": NotificationPriority.LOW}
+    priority_map = {
+        "P1": NotificationPriority.CRITICAL,
+        "P2": NotificationPriority.HIGH,
+        "P3": NotificationPriority.NORMAL,
+        "P4": NotificationPriority.LOW,
+    }
     priority = priority_map.get(severity, NotificationPriority.NORMAL)
 
     fields = {
@@ -366,9 +395,9 @@ def build_incident_notification(
 
     message = f"Root cause identified: {root_cause}"
     if causal_chain:
-        message += f"\n\nCausal chain:\n" + "\n".join(f"  → {c}" for c in causal_chain)
+        message += "\n\nCausal chain:\n" + "\n".join(f"  → {c}" for c in causal_chain)
     if remediation:
-        message += f"\n\nRemediation:\n" + "\n".join(f"  • {r}" for r in remediation[:5])
+        message += "\n\nRemediation:\n" + "\n".join(f"  • {r}" for r in remediation[:5])
 
     return NotificationPayload(
         title=f"Incident RCA: {incident_title}",
@@ -408,8 +437,16 @@ def build_playbook_notification(
     if investigation_url:
         links["Investigation"] = investigation_url
 
+    def _step_icon(status: str) -> str:
+        if status == "success":
+            return "✅"
+        if status == "failed":
+            return "❌"
+        return "⏭️"
+
     step_details = "\n".join(
-        f"  {'✅' if s.get('status') == 'success' else '❌' if s.get('status') == 'failed' else '⏭️'} {s.get('step_name', 'unknown')}: {s.get('output', s.get('error', ''))[:100]}"
+        f"  {_step_icon(s.get('status', ''))} {s.get('step_name', 'unknown')}: "
+        f"{s.get('output', s.get('error', ''))[:100]}"
         for s in steps[:10]
     )
 

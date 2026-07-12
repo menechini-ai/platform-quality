@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from httpx import ASGITransport, AsyncClient
-import pytest
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from httpx import AsyncClient
 
 
 async def test_investigate_returns_200(client: AsyncClient) -> None:
