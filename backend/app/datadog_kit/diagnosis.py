@@ -129,7 +129,7 @@ def _parse_rca_response(raw: str) -> RcaDiagnosis:
         text = text.split("```json")[1].split("```")[0].strip()
     elif "```" in text:
         text = text.split("```")[1].split("```")[0].strip()
-    
+
     # Handle "Extra data" - find first complete JSON object
     try:
         data: dict[str, Any] = json.loads(text)

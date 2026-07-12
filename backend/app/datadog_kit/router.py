@@ -11,6 +11,7 @@ from sqlalchemy import select
 from app.core.db import get_db
 from app.core.models.rca import RcaReport
 from app.core.schemas.rca import RcaReportRead
+from app.datadog.client import DatadogClient
 from app.datadog_kit.collector import fetch_all
 from app.datadog_kit.config import DatadogKitConfig
 from app.datadog_kit.diagnosis import analyze
@@ -48,9 +49,19 @@ async def investigate(
         if entry.status.lower() in ("error", "critical", "fatal")
     ]
 
-    # Step 4: Save to DB
+    # Step 4: Link Datadog incident if provided
+    incident_id = request.incident_id
+    if incident_id:
+        client = DatadogClient()
+        try:
+            incident_data = await client.call(client.get_incident, incident_id=incident_id)
+            logger.info(f"Linked incident {incident_id}: {incident_data.get('title', '')}")
+        except Exception as exc:
+            logger.warning(f"Failed to fetch incident {incident_id}: {exc}")
+
+    # Step 5: Save to DB
     report = RcaReport(
-        incident_id=None,  # optional — can be linked later
+        incident_id=incident_id,  # optional — linked if provided
         summary=f"Investigation for: {request.query}",
         root_cause=diagnosis.root_cause,
         recommendations=diagnosis.remediation_steps,
