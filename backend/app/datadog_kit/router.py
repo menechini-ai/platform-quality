@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 
+from app.core.config import settings
 from app.core.db import get_db
 from app.core.models.rca import RcaReport
 from app.core.schemas.rca import RcaReportRead
@@ -16,6 +17,7 @@ from app.datadog_kit.agent import investigate_react
 from app.datadog_kit.collector import fetch_all
 from app.datadog_kit.config import DatadogKitConfig
 from app.datadog_kit.diagnosis import analyze
+from app.datadog_kit.embeddings import get_similar_incidents_context, search_similar_incidents
 from app.datadog_kit.models import InvestigationRequest, InvestigationRequestV3  # noqa: TC001
 from app.datadog_kit.playbook_executor import (
     PlaybookExecutor,
@@ -40,10 +42,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/datadog", tags=["datadog-investigate"])
 
 
+def check_feature_enabled(feature: str):
+    """Dependency to check if a V4 feature is enabled."""
+    def _check():
+        if not getattr(settings, feature, True):
+            raise HTTPException(status_code=503, detail=f"Feature {feature} is disabled")
+    return Depends(_check)
+
+
 @router.post("/investigate", response_model=RcaReportRead)
 async def investigate(
     request: InvestigationRequest,
     db: AsyncSession = Depends(get_db),
+    _: None = check_feature_enabled("ENABLE_REACT_AGENT"),
 ) -> RcaReport:
     """Run a full investigation: fetch 4 Datadog signals in parallel,
     then produce a structured RCA diagnosis. Result is saved as an RCA report."""
@@ -116,6 +127,7 @@ async def investigate(
 async def investigate_v3(
     request: InvestigationRequestV3,
     db: AsyncSession = Depends(get_db),
+    _: None = check_feature_enabled("ENABLE_REACT_AGENT"),
 ) -> RcaReport:
     """Run ReAct investigation loop: iterative tool use + LLM reasoning.
     Returns enhanced RCA with react_trace, runbook, and MTTR breakdown.
@@ -190,6 +202,7 @@ async def execute_playbook(
     request: dict,
     dry_run: bool = True,
     auto_confirm: bool = False,
+    _: None = check_feature_enabled("ENABLE_PLAYBOOK_EXECUTOR"),
 ):
     """Execute a playbook from runbook mitigation steps.
 
@@ -224,6 +237,7 @@ async def execute_playbook_steps(
     request: dict,
     dry_run: bool = True,
     auto_confirm: bool = False,
+    _: None = check_feature_enabled("ENABLE_PLAYBOOK_EXECUTOR"),
 ):
     """Execute custom playbook steps directly.
 
@@ -267,6 +281,7 @@ async def execute_playbook_steps(
 async def send_notification(
     payload: NotificationPayload,
     channels: list[NotificationChannel] | None = None,
+    _: None = check_feature_enabled("ENABLE_NOTIFICATIONS"),
 ):
     """Send notification to configured channels.
 
@@ -293,6 +308,7 @@ async def send_notification(
 async def notify_incident(
     request: dict,
     channels: list[NotificationChannel] | None = None,
+    _: None = check_feature_enabled("ENABLE_NOTIFICATIONS"),
 ):
     """Build and send incident notification from investigation result.
 
@@ -331,6 +347,7 @@ async def notify_incident(
 async def notify_playbook(
     request: dict,
     channels: list[NotificationChannel] | None = None,
+    _: None = check_feature_enabled("ENABLE_NOTIFICATIONS"),
 ):
     """Build and send playbook execution notification.
 
@@ -379,3 +396,58 @@ async def get_investigation_report(
     if not report:
         raise HTTPException(status_code=404, detail="Investigation report not found")
     return report
+
+
+@router.get("/similar-incidents/{incident_id}")
+async def get_similar_incidents(
+    incident_id: str,
+    threshold: float = 0.75,
+    limit: int = 5,
+    db: AsyncSession = Depends(get_db),
+    _: None = check_feature_enabled("ENABLE_VECTOR_SEARCH"),
+):
+    """Get similar historical incidents for an incident ID."""
+    import uuid
+
+    try:
+        uid = uuid.UUID(incident_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid incident ID") from None
+
+    # Get the incident's embedding text
+    from app.core.models.incident import Incident
+    from app.core.models.incident_embedding import IncidentEmbedding
+    from sqlalchemy import select
+
+    result = await db.execute(
+        select(IncidentEmbedding)
+        .join(Incident, IncidentEmbedding.incident_id == Incident.id)
+        .where(Incident.id == uid)
+    )
+    embedding = result.scalar_one_or_none()
+
+    if not embedding:
+        return {"similar_incidents": [], "message": "No embedding found for this incident"}
+
+    similar = await search_similar_incidents(
+        query_text=embedding.source_text,
+        limit=limit,
+        threshold=threshold,
+        root_cause_category=embedding.root_cause_category,
+    )
+
+    return {
+        "incident_id": incident_id,
+        "similar_incidents": [
+            {
+                "incident_id": str(e.incident_id),
+                "rca_report_id": str(e.rca_report_id) if e.rca_report_id else None,
+                "summary": e.source_text[:200] + "..." if len(e.source_text) > 200 else e.source_text,
+                "root_cause_category": e.root_cause_category,
+                "severity": e.severity,
+                "service": e.service,
+                "similarity": round(score, 3),
+            }
+            for e, score in similar
+        ],
+    }
