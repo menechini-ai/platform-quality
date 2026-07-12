@@ -98,7 +98,7 @@ async def _get_events(
                 EventEntry(
                     timestamp=ev.get("date_happened", ""),
                     title=ev.get("title", ""),
-                    message=ev.get("text", ev.get("message", "")),
+                    message=str(ev.get("text") or ev.get("message") or ""),
                     tags=ev.get("tags", []),
                     source=ev.get("source", ""),
                 )
