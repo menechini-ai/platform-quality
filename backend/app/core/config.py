@@ -59,5 +59,12 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = "redis://localhost:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"
 
+    # --- Vector Store (pgvector) ---
+    VECTOR_DB_URL: str = "postgresql+asyncpg://user:pass@localhost:5432/vectordb"
+    EMBEDDING_MODEL: str = "text-embedding-3-small"
+    EMBEDDING_DIM: int = 1536
+    SIMILARITY_THRESHOLD: float = 0.75
+    MAX_SIMILAR_INCIDENTS: int = 5
+
 
 settings = Settings()

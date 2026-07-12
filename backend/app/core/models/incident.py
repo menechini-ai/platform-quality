@@ -1,5 +1,4 @@
 """Incident and timeline models."""
-
 import uuid
 from datetime import UTC, datetime
 
@@ -36,6 +35,10 @@ class Incident(Base):
 
     timeline = relationship(
         "IncidentTimeline", back_populates="incident", lazy="selectin", cascade="all, delete-orphan"
+    )
+
+    embedding = relationship(
+        "IncidentEmbedding", back_populates="incident", uselist=False, cascade="all, delete-orphan"
     )
 
 

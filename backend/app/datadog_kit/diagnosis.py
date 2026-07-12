@@ -148,10 +148,25 @@ def _parse_rca_response(raw: str) -> RcaDiagnosis:
         causal_chain=data.get("causal_chain", []),
         severity=data.get("severity", "P3"),
         confidence=float(data.get("confidence", 0.0)),
-        evidence_refs=data.get("evidence_refs", {}),
+        evidence_refs=_normalize_evidence_refs(data.get("evidence_refs", {})),
         remediation_steps=data.get("remediation_steps", []),
         inconclusive=bool(data.get("inconclusive", False)),
     )
+
+
+def _normalize_evidence_refs(evidence_refs: Any) -> dict[str, list[str]]:
+    """Ensure evidence_refs is dict[str, list[str]]."""
+    if not isinstance(evidence_refs, dict):
+        return {}
+    normalized = {}
+    for key, value in evidence_refs.items():
+        if isinstance(value, list):
+            normalized[key] = [str(v) for v in value]
+        elif isinstance(value, str):
+            normalized[key] = [value]
+        else:
+            normalized[key] = [str(value)]
+    return normalized
 
 
 async def _call_openai(prompt: str) -> str:
