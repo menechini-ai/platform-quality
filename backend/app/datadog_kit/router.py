@@ -27,9 +27,9 @@ router = APIRouter(prefix="/datadog", tags=["datadog-investigate"])
 
 @router.post("/investigate", response_model=RcaReportRead)
 async def investigate(
-    request: InvestigationRequest,  # noqa: F821
+    request: InvestigationRequest,
     db: AsyncSession = Depends(get_db),
-):
+) -> RcaReport:
     """Run a full investigation: fetch 4 Datadog signals in parallel,
     then produce a structured RCA diagnosis. Result is saved as an RCA report."""
     config = DatadogKitConfig(
@@ -91,7 +91,7 @@ async def investigate(
 async def get_investigation_report(
     report_id: str,
     db: AsyncSession = Depends(get_db),
-):
+) -> RcaReport:
     """Retrieve a saved investigation report by ID."""
     import uuid
 
