@@ -1,15 +1,14 @@
 """LLM-powered RCA diagnosis from collected investigation data."""
-
 from __future__ import annotations
 
 import json
 import logging
 from typing import TYPE_CHECKING, Any
 
-from app.datadog_kit.models import (
-    InvestigationResult,
-    RcaDiagnosis,
-)
+import httpx
+
+from app.core.config import settings
+from app.datadog_kit.models import InvestigationResult, RcaDiagnosis
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -36,18 +35,20 @@ Time range: {time_range_minutes} minutes
 ## Metrics (anomalies)
 {metrics_summary}
 
+## APM Spans (slow traces)
+{spans_summary}
+
 Respond ONLY with a JSON object using these exact keys:
 - "root_cause": short description of the root cause
 - "root_cause_category": one of "deploy", "resource", "latency", "dependency", "data_corruption"
 - "causal_chain": list of events leading to the incident (oldest first)
 - "severity": "P1", "P2", or "P3"
 - "confidence": float 0.0-1.0
-- "evidence_refs": dict with keys "logs", "events", "monitors", "metrics"
+- "evidence_refs": dict with keys "logs", "events", "monitors", "metrics", "spans"
 - "remediation_steps": list of actionable steps
 - "inconclusive": true if confidence < 0.5 or no clear root cause
 
-Be precise. If there's not enough evidence, set inconclusive=true and explain why in root_cause.
-"""
+Be precise. If there's not enough evidence, set inconclusive=true and explain why in root_cause."""
 
 
 def _summarize_logs(result: InvestigationResult) -> str:
@@ -96,6 +97,18 @@ def _summarize_metrics(result: InvestigationResult) -> str:
     return "\n".join(lines) if lines else "No metric anomalies detected."
 
 
+def _summarize_spans(result: InvestigationResult) -> str:
+    spans = result.spans.spans
+    if not spans:
+        return "No APM spans captured."
+    slow = sorted(spans, key=lambda s: s.duration_ns, reverse=True)[:5]
+    lines = []
+    for s in slow:
+        dur_ms = s.duration_ns / 1_000_000
+        lines.append(f"  {s.service}/{s.operation}: {dur_ms:.0f}ms (status={s.status})")
+    return f"{len(spans)} spans, {len(slow)} slowest:\n" + "\n".join(lines)
+
+
 def build_prompt(result: InvestigationResult) -> str:
     """Build the LLM prompt from investigation data."""
     return _DEFAULT_PROMPT_TEMPLATE.format(
@@ -105,19 +118,29 @@ def build_prompt(result: InvestigationResult) -> str:
         events_summary=_summarize_events(result),
         monitors_summary=_summarize_monitors(result),
         metrics_summary=_summarize_metrics(result),
+        spans_summary=_summarize_spans(result),
     )
 
 
 def _parse_rca_response(raw: str) -> RcaDiagnosis:
     """Parse LLM JSON response into RcaDiagnosis."""
-    # Try to extract JSON block
     text = raw.strip()
     if "```json" in text:
         text = text.split("```json")[1].split("```")[0].strip()
     elif "```" in text:
         text = text.split("```")[1].split("```")[0].strip()
-
-    data: dict[str, Any] = json.loads(text)
+    
+    # Handle "Extra data" - find first complete JSON object
+    try:
+        data: dict[str, Any] = json.loads(text)
+    except json.JSONDecodeError as e:
+        # Try to extract first {...} balanced object
+        import re
+        match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', text, re.DOTALL)
+        if match:
+            data = json.loads(match.group())
+        else:
+            raise e
 
     return RcaDiagnosis(
         root_cause=data.get("root_cause", "unknown"),
@@ -131,6 +154,52 @@ def _parse_rca_response(raw: str) -> RcaDiagnosis:
     )
 
 
+async def _call_openai(prompt: str) -> str:
+    """Call OpenAI-compatible API with structured JSON output."""
+    api_key = settings.OPENAI_API_KEY
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY not configured")
+
+    async with httpx.AsyncClient(timeout=120) as client:
+        resp = await client.post(
+            f"{settings.OPENAI_BASE_URL}/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": settings.LLM_MODEL,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "SRE root cause analysis. Output valid JSON.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                "response_format": {"type": "json_object"},
+                "temperature": 0.1,
+                "max_tokens": 2048,
+            },
+        )
+        resp.raise_for_status()
+        # Handle potential concatenated JSON in response
+        raw = resp.text
+        # Parse outer envelope
+        import json
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            # Try to extract first {...}
+            import re
+            match = re.search(r'\{.*\}', raw, re.DOTALL)
+            if match:
+                data = json.loads(match.group())
+            else:
+                raise
+        content = data["choices"][0]["message"]["content"]
+        return content
+
+
 async def analyze(
     result: InvestigationResult,
     llm_call: Callable[..., Any] | None = None,
@@ -140,12 +209,15 @@ async def analyze(
     Args:
         result: The investigation data from ``fetch_all``.
         llm_call: Optional async callable that accepts a prompt string
-            and returns a JSON string. If omitted, returns a basic
-            diagnosis from summary heuristics.
+            and returns a JSON string. Uses OpenAI API if omitted and
+            OPENAI_API_KEY is configured.
 
     Returns:
         A structured RCA diagnosis.
     """
+    if llm_call is None and settings.OPENAI_API_KEY:
+        llm_call = _call_openai
+
     if llm_call is None:
         return _fallback_diagnosis(result)
 
@@ -155,6 +227,7 @@ async def analyze(
         return _parse_rca_response(raw)
     except Exception as exc:
         logger.warning("[datadog_kit] LLM diagnosis failed: %s", exc)
+        logger.debug("Prompt was:\n%s", prompt)
         return _fallback_diagnosis(result)
 
 

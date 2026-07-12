@@ -32,7 +32,7 @@ class Settings(BaseSettings):
         return v
 
     # --- PostgreSQL ---
-    DATABASE_URL: str = "postgresql+asyncpg://observai:observai@localhost:5432/observai"
+    DATABASE_URL: str = "sqlite+aiosqlite:///./observai.db"
 
     # --- Redis (cache + celery broker) ---
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     DATADOG_API_KEY: str | None = None
     DATADOG_APP_KEY: str | None = None
     DATADOG_SITE: str = "datadoghq.com"
+
+    # --- LLM ---
+    OPENAI_API_KEY: str | None = None
+    OPENAI_BASE_URL: str = "https://api.openai.com/v1"
+    LLM_MODEL: str = "gpt-4o-mini"
 
     # --- Auth ---
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
