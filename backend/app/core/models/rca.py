@@ -16,8 +16,7 @@ class RcaReport(Base):
     incident_id = Column(
         UUID(as_uuid=True),
         ForeignKey("incidents.id", ondelete="CASCADE"),
-        nullable=False,
-        unique=True,
+        nullable=True,
     )
     summary = Column(Text, nullable=True)
     root_cause = Column(Text, nullable=True)
