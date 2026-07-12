@@ -48,8 +48,12 @@ async def noauth_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient,
 
 
 @pytest_asyncio.fixture
-async def authed_client(noauth_client: AsyncClient) -> AsyncClient:
+async def authed_client(noauth_client: AsyncClient, db_session: AsyncSession) -> AsyncClient:
     """Test client with DB override + valid auth token."""
+    from app.auth.service import UserService
+
+    await UserService.create_user(db_session, "admin", "admin")
+    await db_session.commit()
     resp = await noauth_client.post(
         "/api/v1/auth/login",
         json={"username": "admin", "password": "admin"},
@@ -61,8 +65,12 @@ async def authed_client(noauth_client: AsyncClient) -> AsyncClient:
 
 class TestLogin:
     @pytest.mark.asyncio
-    async def test_login_success(self, raw_client: AsyncClient):
-        resp = await raw_client.post(
+    async def test_login_success(self, noauth_client: AsyncClient, db_session: AsyncSession):
+        from app.auth.service import UserService
+
+        await UserService.create_user(db_session, "admin", "admin")
+        await db_session.commit()
+        resp = await noauth_client.post(
             "/api/v1/auth/login",
             json={"username": "admin", "password": "admin"},
         )
@@ -93,13 +101,17 @@ class TestLogin:
 
 class TestMe:
     @pytest.mark.asyncio
-    async def test_me_with_valid_token(self, raw_client: AsyncClient):
-        login_resp = await raw_client.post(
+    async def test_me_with_valid_token(self, noauth_client: AsyncClient, db_session: AsyncSession):
+        from app.auth.service import UserService
+
+        await UserService.create_user(db_session, "admin", "admin")
+        await db_session.commit()
+        login_resp = await noauth_client.post(
             "/api/v1/auth/login",
             json={"username": "admin", "password": "admin"},
         )
         token = login_resp.json()["access_token"]
-        resp = await raw_client.get(
+        resp = await noauth_client.get(
             "/api/v1/auth/me",
             headers={"Authorization": f"Bearer {token}"},
         )

@@ -2,28 +2,40 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, HTTPException, Query
 
 from app.datadog.client import DatadogClient
+from app.datadog.filters import compose_filters, to_domain_kwargs
 from app.datadog.formatters import fmt_slos, maybe_human
-from app.datadog.write_guard import assert_write_allowed, sanitize_error_message
+from app.datadog.schemas import DatadogFilter, Period
+from app.datadog.write_guard import (
+    assert_write_allowed,
+    get_datadog_url,
+    get_headers,
+    sanitize_error_message,
+)
 
 router = APIRouter()
 
 
 @router.get("/datadog/slos")
 async def list_datadog_slos(
-    tags: str | None = Query(None, description="Tag filter"),
+    tags: list[str] | None = Query(default=None, description="Tag filter (env:prod, service:api)"),
     query: str | None = Query(None, description="Substring match on SLO name/description"),
+    period: Period | None = Query(default=None, description="Time window: 1d, 7d, 15d, 30d"),
     limit: int = Query(50, le=200),
     offset: int = Query(0, ge=0),
     human: bool = Query(False, alias="human"),
 ):
     """List Datadog SLOs with optional tag filtering."""
+    composed = compose_filters(DatadogFilter(tags=tags, period=period))
+    fkw = to_domain_kwargs("slos", composed)
     client = DatadogClient()
     kwargs: dict = {"limit": limit, "offset": offset}
-    if tags:
-        kwargs["tags_query"] = tags
+    if "tags_query" in fkw:
+        kwargs["tags_query"] = fkw["tags_query"]
     if query:
         kwargs["query"] = query
     try:
@@ -40,13 +52,17 @@ async def list_slo_corrections(
     offset: int = Query(0, ge=0),
 ):
     """List SLO corrections (manual adjustments)."""
-    client = DatadogClient()
-    kwargs: dict = {"limit": limit, "offset": offset}
+    import httpx
+
+    params: dict[str, Any] = {"limit": limit, "offset": offset}
     if slo_id:
-        kwargs["slo_id"] = slo_id
+        params["slo_id"] = slo_id
     try:
-        r = client.slos.list_slo_corrections(**kwargs)
-        return r.to_dict()
+        async with httpx.AsyncClient() as hc:
+            url = f"{get_datadog_url()}/api/v2/slo/corrections"
+            resp = await hc.get(url, headers=get_headers(), params=params)
+            resp.raise_for_status()
+            return resp.json()
     except Exception as e:
         raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
 

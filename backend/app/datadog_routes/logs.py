@@ -5,7 +5,9 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 
 from app.datadog.client import DatadogClient
+from app.datadog.filters import compose_filters, to_domain_kwargs
 from app.datadog.formatters import fmt_logs, maybe_human
+from app.datadog.schemas import DatadogFilter, Period
 from app.datadog.write_guard import sanitize_error_message
 
 router = APIRouter()
@@ -14,23 +16,28 @@ router = APIRouter()
 @router.get("/datadog/logs")
 async def list_logs(
     query: str | None = Query(default=None),
+    tags: list[str] | None = Query(default=None, description="Tag filter (env:prod, service:api)"),
+    period: Period | None = Query(default=None, description="Time window: 1d, 7d, 15d, 30d"),
     limit: int = Query(default=50, le=200),
     sort: str = "-timestamp",
     from_ts: int | None = None,
     to_ts: int | None = None,
     human: bool = Query(False, alias="human"),
 ):
-    """Search Datadog logs."""
+    """Search Datadog logs filtered by tags and time window."""
+    composed = compose_filters(DatadogFilter(tags=tags, period=period))
+    fkw = to_domain_kwargs("logs", composed)
+    combined = " ".join(p for p in [query, fkw.get("query")] if p) or ""
     client = DatadogClient()
     try:
         r = client.search_logs(
-            query or "",
+            combined,
             limit=limit,
             sort=sort,
-            filter_from=from_ts,
-            filter_to=to_ts,
+            filter_from=fkw.get("from", from_ts),
+            filter_to=fkw.get("to", to_ts),
         )
-        return maybe_human(r, fmt_logs, human, meta={"query": query})
+        return maybe_human(r, fmt_logs, human, meta={"query": combined or None})
     except Exception as e:
         raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
 
@@ -58,7 +65,7 @@ async def submit_log(
     body = HTTPLog([item])
     try:
         r = client.logs.submit_log(body=body)
-        return {"status": "ok", "response": r.to_dict()}
+        return {"status": "ok", "response": r}
     except Exception as e:
         raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
 

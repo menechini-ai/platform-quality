@@ -5,7 +5,9 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 
 from app.datadog.client import DatadogClient
+from app.datadog.filters import compose_filters, period_to_range
 from app.datadog.formatters import fmt_metrics, maybe_human
+from app.datadog.schemas import DatadogFilter, Period
 from app.datadog.write_guard import sanitize_error_message
 
 router = APIRouter()
@@ -15,10 +17,14 @@ router = APIRouter()
 async def query_metrics(
     metric: str = Query(..., description="Metric name, e.g. 'system.cpu.user'"),
     agg: str = Query("avg", description="Aggregation: avg, sum, max, min, count"),
-    tags: str = Query("*", description="Tag filter, e.g. 'service:api,env:prod'"),
+    tags: str = Query("*", description="Tag scope filter, e.g. 'service:api,env:prod'"),
     scope: str | None = Query(
         None, description="Full scope override, e.g. 'service:api AND env:prod'"
     ),
+    filter_tags: list[str] | None = Query(
+        default=None, description="UST tags, AND-combined with global default"
+    ),
+    period: Period | None = Query(default=None, description="Time window: 1d, 7d, 15d, 30d"),
     from_ts: int | None = None,
     to_ts: int | None = None,
     days: int = Query(1, ge=1, le=30),
@@ -29,20 +35,24 @@ async def query_metrics(
     Tags follow Unified Service Tagging (UST) standard:
       env:prod/staging/dev, service:<name>, team:<team>
 
-    Examples:
-      /api/v1/datadog/metrics?metric=system.cpu.user&tags=service:api,env:prod
-      /api/v1/datadog/metrics?metric=trace.servlet.request.hits&agg=sum&tags=*&days=7
-      /api/v1/datadog/metrics?metric=jvm.heap_memory&tags=service:worker,env:staging
+    `filter_tags` (and the global default from settings) are AND-combined into the
+    query scope; `period` sets the time window.
     """
     from datetime import UTC, datetime
 
-    now = int(datetime.now(UTC).timestamp())
-    from_val = from_ts or (now - 3600 * 24 * days)
-    to_val = to_ts or now
+    composed = compose_filters(DatadogFilter(tags=filter_tags, period=period))
+    rng = period_to_range(composed.period)
 
-    # Build scope: if tags != "*", convert to Datadog scope syntax
+    now = int(datetime.now(UTC).timestamp())
+    from_val = from_ts or (rng[0] if rng else now - 3600 * 24 * days)
+    to_val = to_ts or (rng[1] if rng else now)
+
+    # Build scope: explicit scope wins; else combined UST tags (global + request);
+    # else the existing string `tags` scope; else all.
     if scope:
         scope_query = scope
+    elif composed.tags:
+        scope_query = ",".join(composed.tags)
     elif tags != "*":
         tag_pairs = [t.strip() for t in tags.split(",") if t.strip()]
         scope_query = ",".join(tag_pairs)
@@ -53,7 +63,7 @@ async def query_metrics(
 
     client = DatadogClient()
     try:
-        r = client.query_metrics(query=dd_query, from_ts=from_val, to_ts=to_val)
+        r = await client.query_metrics(query=dd_query, from_ts=from_val, to_ts=to_val)
         return maybe_human(r, fmt_metrics, human, meta={"query": dd_query})
     except Exception as e:
         raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e

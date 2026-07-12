@@ -7,6 +7,6 @@
     "**/__pycache__",
     "**/.venv"
   ],
-  "typeCheckingMode": "off",
+  "typeCheckingMode": "basic",
   "reportMissingImports": true
 }

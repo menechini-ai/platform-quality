@@ -8,6 +8,7 @@ dependencies = [
     "uvicorn[standard]>=0.30.0,<1",
     "sqlalchemy[asyncio]>=2.0.0,<3",
     "asyncpg>=0.29.0,<1",
+    "psycopg2-binary>=2.9.0,<3",  # sync driver for Alembic migrations (env.py strips +asyncpg)
     "alembic>=1.13.0,<2",
     "pydantic>=2.0.0,<3",
     "pydantic-settings>=2.0.0,<3",
@@ -16,16 +17,26 @@ dependencies = [
     "pgvector>=0.2.0,<1",
     "python-jose[cryptography]>=3.3.0,<4",
     "passlib[bcrypt]>=1.7.4,<2",
+    "bcrypt>=4.0.1,<4.1",  # pin bcrypt <4.1: 4.1.0 removed __about__, which passlib 1.7.4 reads at import
     "python-multipart>=0.0.9,<1",
-    "redis>=5.0.0,<6",
-    "celery>=5.3.0,<6",
+    # redis and celery are reserved for future background-task infrastructure (M1/M2);
+    # uncomment when implementing.
+    # "redis>=5.0.0,<6",
+    # "celery>=5.3.0,<6",
     "sentry-sdk>=2.0.0,<3",
     "gunicorn>=22.0.0,<23",
     "tenacity>=8.0.0,<9",
     "pytz>=2024.0,<2025",
-    "ruff>=0.15.20",
-    "pytest>=8.4.2",
-    "pytest-asyncio>=0.26.0",
+    # AI Capabilities
+    "litellm>=1.50.0",
+    "langgraph>=0.3.0",
+    "langchain-core>=0.3.0",
+    "langchain-openai>=0.3.0",
+    "langchain-community>=0.3.0",
+    "mcp>=1.2.0",
+    "langfuse>=2.0.0",
+    "sse-starlette>=2.0.0",
+    "pgvector>=0.3.0",
 ]
 
 [project.optional-dependencies]
@@ -41,7 +52,7 @@ dev = [
     "aresponses>=3.0.0,<4",
     "aiosqlite>=0.20.0,<1",
     "pyright>=1.1.411",
-    "vulture>=2.3",
+    "vulture>=2.16",
 ]
 
 [tool.setuptools.packages.find]

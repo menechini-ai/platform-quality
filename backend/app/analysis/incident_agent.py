@@ -42,6 +42,7 @@ def _service_filter(incident: Incident) -> str:
 async def analyze_incident(
     incident_id: str,
     db: AsyncSession,
+    tags: str | None = None,
 ) -> AnalysisResult:
     """Analyze an incident: enrich with Datadog context, detect patterns, assess severity."""
     from uuid import UUID
@@ -76,7 +77,7 @@ async def analyze_incident(
         events = client.events.list_events(
             start=from_ts,
             end=to_ts,
-            tags=incident.service or None,
+            tags=incident.service or "",
         )
         dd_events = events.to_dict().get("events", [])
         findings.append(
@@ -176,6 +177,46 @@ async def analyze_incident(
             )
     except Exception as e:
         logger.warning("Error Tracking query failed: %s", e)
+
+    # 5b. Multi-Metric SRE Analysis (Datadog metrics correlation)
+    try:
+        from app.analysis.sre_metrics import SREMetricsAnalyzer
+
+        sre_analyzer = SREMetricsAnalyzer(
+            service=incident.service,
+            tags=tags,  # overrides service when set
+            window_min=60,
+        )
+        sre_result = sre_analyzer.analyze_all_sync()
+        findings.append(
+            {
+                "type": "sre_analysis",
+                "health_score": sre_result.score,
+                "narrative": sre_result.narrative,
+                "metrics": [
+                    {
+                        "metric_id": m.metric_id,
+                        "name": m.name,
+                        "value": m.value,
+                        "unit": m.unit,
+                        "status": m.status,
+                    }
+                    for m in sre_result.metrics
+                ],
+                "correlations": [
+                    {"rule_id": c.rule_id, "label": c.label, "severity": c.severity}
+                    for c in sre_result.correlations
+                ],
+            }
+        )
+        sre_critical = [m for m in sre_result.metrics if m.status == "critical"]
+        if sre_critical:
+            recommendations.append(
+                f"SRE: {len(sre_critical)} critical metric(s) during incident window — "
+                f"{', '.join(m.name for m in sre_critical)}"
+            )
+    except Exception as e:
+        logger.warning("SRE metrics analysis failed: %s", e)
 
     # 6. Assess severity correctness
     severity_mismatch = _assess_severity(incident, dd_events)

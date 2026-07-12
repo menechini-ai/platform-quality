@@ -12,3 +12,4 @@ from app.core.models.maturity import MaturityAssessment  # noqa: F401, F403
 from app.core.models.rca import RcaReport  # noqa: F401, F403
 from app.core.models.report import Report  # noqa: F401, F403
 from app.core.models.self_healing import AutoHealAction, Runbook  # noqa: F401, F403
+from app.core.models.user import RevokedToken, User  # noqa: F401, F403

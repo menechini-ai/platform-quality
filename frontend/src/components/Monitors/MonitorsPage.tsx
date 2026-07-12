@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useDdMonitors } from "@/api/client";
 import { AlertTriangle, CheckCircle2, Ban, Minus } from "lucide-react";
 
@@ -18,15 +19,29 @@ const stateColor: Record<string, string> = {
 };
 
 export function MonitorsPage() {
-  const { data: monitors, isLoading } = useDdMonitors();
+  const [tagsFilter, setTagsFilter] = useState("");
+  const { data: monitors, isLoading } = useDdMonitors(
+    tagsFilter ? { tags: tagsFilter } : undefined,
+  );
 
   if (isLoading) return <div className="animate-pulse text-slate-500 font-mono text-sm">Loading monitors...</div>;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Monitors</h1>
-        <p className="text-sm text-slate-500 mt-1 font-mono">Datadog monitors — {monitors?.length ?? 0} total</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Monitors</h1>
+          <p className="text-sm text-slate-500 mt-1 font-mono">Datadog monitors — {monitors?.length ?? 0} total</p>
+        </div>
+        <input
+          type="text"
+          value={tagsFilter}
+          onChange={(e) => setTagsFilter(e.target.value)}
+          placeholder="Tags (e.g. env:prod,service:api)"
+          className="px-3 py-2 rounded-lg bg-surface-800 border border-surface-600
+                     text-white text-sm placeholder:text-slate-500 w-72
+                     focus:outline-none focus:ring-2 focus:ring-brand-500"
+        />
       </div>
 
       {!monitors || monitors.length === 0 ? (

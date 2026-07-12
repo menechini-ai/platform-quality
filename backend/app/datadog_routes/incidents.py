@@ -7,7 +7,9 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 
 from app.datadog.client import DatadogClient
+from app.datadog.filters import compose_filters, to_domain_kwargs
 from app.datadog.formatters import fmt_incidents, maybe_human
+from app.datadog.schemas import DatadogFilter, Period
 from app.datadog.write_guard import assert_write_allowed, sanitize_error_message
 
 router = APIRouter()
@@ -15,15 +17,23 @@ router = APIRouter()
 
 @router.get("/datadog/incidents")
 async def list_datadog_incidents(
-    query: str | None = Query(None, description="Search query with tags"),  # noqa: ARG001
+    tags: list[str] | None = Query(default=None, description="Tag filter (env:prod, service:api)"),
+    period: Period | None = Query(default=None, description="Time window: 1d, 7d, 15d, 30d"),
     page_size: int = Query(10, le=200),
     page_number: int = Query(0, ge=0),
     human: bool = Query(False, alias="human"),
 ):
-    """List Datadog incidents with optional tag-based filtering."""
+    """List Datadog incidents with optional tag-based filtering.
+
+    v2 list_incidents has no tag param, so tag filters route through search_incidents.
+    """
+    composed = compose_filters(DatadogFilter(tags=tags, period=period))
     client = DatadogClient()
     try:
-        data = client.list_incidents(page_size=page_size, page_number=page_number)
+        if composed.tags:
+            data = client.search_incidents(to_domain_kwargs("incidents", composed)["query"])
+        else:
+            data = client.list_incidents(page_size=page_size, page_number=page_number)
         return maybe_human(data, fmt_incidents, human, meta={"total": len(data)})
     except Exception as e:
         raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
@@ -61,10 +71,16 @@ async def create_datadog_incident(
     """Create a Datadog incident."""
     assert_write_allowed()
     client = DatadogClient()
-    attrs: dict[str, Any] = {"title": title}
-    if customer_impact:
-        attrs["customer_impact"] = customer_impact
-    body = {"data": {"attributes": attrs}}
+    from datadog_api_client.v2.model.incident_create_attributes import IncidentCreateAttributes
+    from datadog_api_client.v2.model.incident_create_data import IncidentCreateData
+    from datadog_api_client.v2.model.incident_create_request import IncidentCreateRequest
+    from datadog_api_client.v2.model.incident_type import IncidentType
+
+    data = IncidentCreateData(
+        attributes=IncidentCreateAttributes(title=title, customer_impacted=bool(customer_impact)),
+        type=IncidentType.INCIDENTS,
+    )
+    body = IncidentCreateRequest(data=data)
     try:
         r = client.incidents.create_incident(body=body)
         return r.to_dict()
@@ -77,7 +93,17 @@ async def update_datadog_incident(incident_id: str, title: str):
     """Update a Datadog incident."""
     assert_write_allowed()
     client = DatadogClient()
-    body = {"data": {"attributes": {"title": title}}}
+    from datadog_api_client.v2.model.incident_type import IncidentType
+    from datadog_api_client.v2.model.incident_update_attributes import IncidentUpdateAttributes
+    from datadog_api_client.v2.model.incident_update_data import IncidentUpdateData
+    from datadog_api_client.v2.model.incident_update_request import IncidentUpdateRequest
+
+    data = IncidentUpdateData(
+        id=incident_id,
+        type=IncidentType.INCIDENTS,
+        attributes=IncidentUpdateAttributes(title=title),
+    )
+    body = IncidentUpdateRequest(data=data)
     try:
         r = client.incidents.update_incident(incident_id=incident_id, body=body)
         return r.to_dict()

@@ -12,6 +12,7 @@ class KnowledgeBaseCreate(BaseModel):
     root_cause: str | None = None
     resolution_steps: list[str] | None = None
     tags: list[str] | None = None
+    embedding: list[float] | None = None
 
 
 class KnowledgeBaseRead(BaseModel):
@@ -22,5 +23,6 @@ class KnowledgeBaseRead(BaseModel):
     resolution_steps: list[str] | None = None
     tags: list[str] | None = None
     created_at: datetime
+    embedding: list[float] | None = None
 
     model_config = {"from_attributes": True}

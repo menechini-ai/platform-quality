@@ -2,11 +2,21 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, HTTPException, Query
 
 from app.datadog.client import DatadogClient
+from app.datadog.filters import compose_filters, to_domain_kwargs
 from app.datadog.formatters import fmt_events, maybe_human
-from app.datadog.write_guard import assert_write_allowed, sanitize_error_message
+from app.datadog.schemas import DatadogFilter, Period
+from app.datadog.write_guard import (
+    assert_write_allowed,
+    friendly_datadog_error,
+    get_datadog_url,
+    get_headers,
+    sanitize_error_message,
+)
 
 router = APIRouter()
 
@@ -17,30 +27,30 @@ async def list_events(
     end: int | None = None,
     priority: str | None = None,
     sources: str | None = None,
-    tags: str | None = None,
+    tags: list[str] | None = Query(default=None, description="Tag filter (env:prod, service:api)"),
+    period: Period | None = Query(default=None, description="Time window: 1d, 7d, 15d, 30d"),
     human: bool = Query(False, alias="human"),
 ):
     """List Datadog events with optional filters."""
     from datetime import UTC, datetime
 
-    kwargs: dict[str, object] = {}
-    if start:
-        kwargs["start"] = start
-    if end:
-        kwargs["end"] = end
+    composed = compose_filters(DatadogFilter(tags=tags, period=period))
+    fkw = to_domain_kwargs("events", composed)
+
+    kwargs: dict[str, Any] = {}
     if priority:
         kwargs["priority"] = priority
     if sources:
         kwargs["sources"] = sources.replace(",", ",")
-    if tags:
-        kwargs["tags"] = tags
+    if "tags" in fkw:
+        kwargs["tags"] = fkw["tags"]
 
     client = DatadogClient()
-    # SDK requires start/end; default to last 24h
+    # SDK requires start/end; default to last 24h, override with period when given
     now = int(datetime.now(UTC).timestamp())
     r = client.events.list_events(
-        start=kwargs.pop("start", now - 86400),
-        end=kwargs.pop("end", now),
+        start=fkw.get("start", start or now - 86400),
+        end=fkw.get("end", end or now),
         **kwargs,
     )
     data = r.to_dict()
@@ -55,7 +65,8 @@ async def get_event(event_id: int):
         r = client.events.get_event(event_id=event_id)
         return r.to_dict()
     except Exception as e:
-        raise HTTPException(status_code=404, detail=sanitize_error_message(str(e))) from e
+        status, detail = friendly_datadog_error(e)
+        raise HTTPException(status_code=status, detail=detail) from e
 
 
 @router.post("/datadog/events")
@@ -83,15 +94,19 @@ async def create_event(
 async def update_event(event_id: int, title: str | None = None, text: str | None = None):
     """Update an existing event."""
     assert_write_allowed()
-    client = DatadogClient()
-    body = {}
+    import httpx
+
+    body: dict[str, Any] = {}
     if title is not None:
         body["title"] = title
     if text is not None:
         body["text"] = text
     try:
-        r = client.events.update_event(event_id=event_id, body=body)
-        return r.to_dict()
+        async with httpx.AsyncClient() as hc:
+            url = f"{get_datadog_url()}/api/v1/events/{event_id}"
+            resp = await hc.put(url, headers=get_headers(), json=body)
+            resp.raise_for_status()
+            return resp.json()
     except Exception as e:
         raise HTTPException(status_code=404, detail=sanitize_error_message(str(e))) from e
 
@@ -100,9 +115,13 @@ async def update_event(event_id: int, title: str | None = None, text: str | None
 async def delete_event(event_id: int):
     """Delete an event."""
     assert_write_allowed()
-    client = DatadogClient()
+    import httpx
+
     try:
-        client.events.delete_event(event_id=event_id)
-        return {"deleted": True}
+        async with httpx.AsyncClient() as hc:
+            url = f"{get_datadog_url()}/api/v1/events/{event_id}"
+            resp = await hc.delete(url, headers=get_headers())
+            resp.raise_for_status()
+            return {"deleted": True}
     except Exception as e:
         raise HTTPException(status_code=404, detail=sanitize_error_message(str(e))) from e

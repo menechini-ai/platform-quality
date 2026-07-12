@@ -18,6 +18,7 @@ import { MaturityPage } from "./Maturity/MaturityPage";
 import { ReportsPage } from "./Reports/ReportsPage";
 import { ErrorTrackingPage } from "./ErrorTracking/ErrorTrackingPage";
 import { SyntheticsPage } from "./Synthetics/SyntheticsPage";
+import { KBSearchPage } from "./KB/KBSearchPage";
 import { Layout } from "./Layout/Layout";
 import { TagFilter } from "./TagFilter/TagFilter";
 
@@ -120,6 +121,18 @@ describe("SelfHealingPage", () => {
     renderPage(SelfHealingPage);
     expect(screen.getByRole("heading", { level: 1 })).toBeDefined();
   });
+
+  it("renders Run SRE Analysis button", () => {
+    renderPage(SelfHealingPage);
+    expect(screen.getByRole("button", { name: /run sre analysis/i })).toBeDefined();
+  });
+
+  it("renders action status filter tabs", () => {
+    renderPage(SelfHealingPage);
+    expect(screen.getByText("All")).toBeDefined();
+    expect(screen.getByText("Pending")).toBeDefined();
+    expect(screen.getByText("Approved")).toBeDefined();
+  });
 });
 
 describe("MaturityPage", () => {
@@ -180,5 +193,13 @@ describe("TagFilter", () => {
       );
     }});
     expect(screen.getByPlaceholderText(/tags/i)).toBeDefined();
+  });
+});
+
+describe("KBSearchPage", () => {
+  it("renders heading and search input", () => {
+    renderPage(KBSearchPage);
+    expect(screen.getByRole("heading", { level: 1, name: /knowledge base/i })).toBeDefined();
+    expect(screen.getByPlaceholderText(/search.*knowledge/i)).toBeDefined();
   });
 });

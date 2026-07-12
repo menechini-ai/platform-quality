@@ -11,6 +11,7 @@ class RcaReportCreate(BaseModel):
     incident_id: UUID
     summary: str | None = None
     root_cause: str | None = None
+    services: list[str] | None = None
     recommendations: list[str] | None = None
 
 
@@ -19,6 +20,8 @@ class RcaReportRead(BaseModel):
     incident_id: UUID | None = None
     summary: str | None = None
     root_cause: str | None = None
+    confidence: float = 0.0
+    dependency_chain: Any | None = None
     timeline: Any | None = None
     metrics_snapshot: Any | None = None
     logs_snapshot: Any | None = None

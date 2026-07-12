@@ -150,11 +150,10 @@ class TestIncidentsExtra:
         assert resp.json() == []
 
     @pytest.mark.asyncio
-    async def test_create_timeline_event_incident_not_found(
-        self, client: AsyncClient
-    ):
+    async def test_create_timeline_event_incident_not_found(self, client: AsyncClient):
         """Timeline endpoint creates event even if incident missing (no FK validation)."""
         from uuid import uuid4
+
         fake_id = str(uuid4())
         resp = await client.post(
             f"{P}/incidents/{fake_id}/timeline",

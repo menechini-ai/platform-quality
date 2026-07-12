@@ -19,7 +19,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: observai
           POSTGRES_PASSWORD: observai
@@ -50,11 +50,49 @@ jobs:
           . .venv/bin/activate
           uv pip install -e ".[dev]"
 
+      - name: Migrate DB (alembic upgrade head)
+        run: .venv/bin/alembic upgrade head
+        env:
+          DATABASE_URL: postgresql+asyncpg://observai:observai@localhost:5432/observai
+
       - name: Lint (ruff)
         run: .venv/bin/ruff check app/ tests/
 
-      - name: Type check (pyright)
-        run: .venv/bin/python -m pyright app/ alembic/
+      - name: Type check (pyright, changed files)
+        # Scope pyright to backend files changed in this PR (vs origin/develop),
+        # matching the pre-commit pyright hook. The repo has pre-existing
+        # type errors in WIP modules, so a whole-tree check would block every PR.
+        run: |
+          root=$(git rev-parse --show-toplevel)
+          files=$(git -C "$root" diff --name-only origin/develop...HEAD -- 'backend/app/**' 'backend/alembic/**' | grep -E '\.py$' | sed 's|^backend/||')
+          if [ -z "$files" ]; then
+            echo "No backend Python files changed — skipping pyright."
+            exit 0
+          fi
+          echo "$files" | xargs .venv/bin/python -m pyright --project pyrightconfig.json
+
+      - name: Dead code (vulture)
+        run: .venv/bin/vulture app/ --min-confidence 65
+
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v1
+
+      - name: Datadog test marker guard
+        # Scope to test files changed in this PR (vs origin/develop). Pre-existing
+        # datadog tests on develop are skipped via conftest when credentials are
+        # absent, so a whole-tree check would block every PR for out-of-scope files.
+        run: |
+          root=$(git rev-parse --show-toplevel)
+          fail=0
+          for f in $(git -C "$root" diff --name-only origin/develop...HEAD -- 'backend/tests/**'); do
+            if grep -liqE "datadog" "$f" 2>/dev/null; then
+              if ! grep -qE "pytest.mark.datadog" "$f"; then
+                echo "MISSING @pytest.mark.datadog in $f"
+                fail=1
+              fi
+            fi
+          done
+          exit $fail
 
       - name: Test (unit)
         run: .venv/bin/python -m pytest tests/ -m "not datadog" -v --cov=app --cov-report=term-missing
@@ -89,9 +127,73 @@ jobs:
       - name: Build
         run: npm run build
 
+  pre-commit:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: observai
+          POSTGRES_PASSWORD: observai
+          POSTGRES_DB: observai
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://observai:observai@localhost:5432/observai
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install pre-commit
+        run: python -m pip install pre-commit
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          uv venv .venv
+          . .venv/bin/activate
+          uv pip install -e ".[dev]"
+
+      - name: Migrate DB (alembic upgrade head)
+        working-directory: backend
+        run: .venv/bin/alembic upgrade head
+        env:
+          DATABASE_URL: postgresql+asyncpg://observai:observai@localhost:5432/observai
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run pre-commit
+        # Scope to files changed in this PR (vs origin/develop) rather than
+        # --all-files. The repo has pre-existing type errors in WIP modules;
+        # --all-files would make pyright (and other hooks) fail on every PR.
+        run: |
+          git fetch origin develop --depth=1
+          . backend/.venv/bin/activate
+          pre-commit run --from-ref origin/develop --to-ref HEAD
+
   docker:
     if: github.ref == 'refs/heads/main'
-    needs: [backend, frontend]
+    needs: [backend, frontend, pre-commit]
     runs-on: ubuntu-latest
     permissions:
       contents: read
