@@ -6,7 +6,8 @@ with the per-request filter; `to_domain_kwargs` maps the uniform filter onto eac
 native Datadog parameter.
 
 Tag representation differs per domain (verified against datadog-api-client):
-- comma string: monitors, events, metrics_explore (filter_tags), slos (tags_query), synthetics
+- comma string: monitors (monitor_tags), events, metrics_explore (filter_tags),
+  slos (tags_query), synthetics
 - query string `tags:k`: logs, spans, rum, apm, incidents (search_incidents)
 - list: error_tracking (filter[tags])
 Time windows use `from`/`to` (logs/spans/rum/apm/metrics_explore/slos), `start`/`end`
@@ -57,7 +58,7 @@ def to_domain_kwargs(domain: str, filt: DatadogFilter) -> dict[str, Any]:
 
     if domain == "monitors":
         if tags:
-            kw["tags"] = ",".join(tags)
+            kw["monitor_tags"] = ",".join(tags)
 
     elif domain == "events":
         if tags:
@@ -70,7 +71,14 @@ def to_domain_kwargs(domain: str, filt: DatadogFilter) -> dict[str, Any]:
         if tags:
             kw["query"] = _tag_query(tags)
 
-    elif domain in ("logs", "spans", "rum", "apm"):
+    elif domain == "logs":
+        # Datadog Logs v2 query rejects the `tags:` prefix (400); use the facet form `key:value`.
+        if tags:
+            kw["query"] = " ".join(tags)
+        if rng:
+            kw["from"], kw["to"] = rng
+
+    elif domain in ("spans", "rum", "apm"):
         if tags:
             kw["query"] = _tag_query(tags)
         if rng:

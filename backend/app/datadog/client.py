@@ -97,9 +97,9 @@ class DatadogClient:
         """Return the shared singleton, creating it on first use."""
         return cls()
 
-    async def query_metrics(self, query: str, from_ts: int, to_ts: int) -> dict[str, Any]:
+    async def query_metrics(self, query: str, from_ts: int, to_ts: int) -> Any:
         """Query Datadog metrics via the shared retry/thread-offload path."""
-        return await self.call(self.metrics.query_metrics, query=query, from_ts=from_ts, to=to_ts)
+        return await self.call(self.metrics.query_metrics, query=query, _from=from_ts, to=to_ts)
 
     def list_monitors(self, **kwargs: Any) -> list[dict[str, Any]]:
         """List all Datadog monitors."""

@@ -2,15 +2,48 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query
+from typing import Any
+
+from fastapi import APIRouter, HTTPException, Query, Response
 
 from app.datadog.client import DatadogClient
 from app.datadog.filters import compose_filters, period_to_range
-from app.datadog.formatters import fmt_metrics, maybe_human
+from app.datadog.formatters import fmt_metrics
 from app.datadog.schemas import DatadogFilter, Period
 from app.datadog.write_guard import sanitize_error_message
 
 router = APIRouter()
+
+
+def _shape_metrics(raw: dict[str, Any], query: str) -> dict[str, Any]:
+    """Reshape a Datadog v1 metrics response into the shape the frontend expects.
+
+    Datadog returns ``series[].pointlist`` as ``[[ts, value], ...]`` at the top
+    level; the frontend expects ``resp.series[].points`` as ``[{timestamp, value}]``.
+    """
+    series: list[dict[str, Any]] = []
+    for s in raw.get("series", []):
+        points = [
+            {"timestamp": int(p[0]), "value": p[1]}
+            for p in s.get("pointlist", [])
+            if p and len(p) == 2
+        ]
+        series.append(
+            {
+                "metric": s.get("metric") or s.get("expression") or s.get("display_name"),
+                "points": points,
+                "tag_set": s.get("tag_set") or s.get("scope"),
+            }
+        )
+    return {
+        "status": "ok",
+        "resp": {
+            "series": series,
+            "from_date": raw.get("from_date"),
+            "to_date": raw.get("to_date"),
+            "query": query,
+        },
+    }
 
 
 @router.get("/datadog/metrics")
@@ -64,7 +97,13 @@ async def query_metrics(
     client = DatadogClient()
     try:
         r = await client.query_metrics(query=dd_query, from_ts=from_val, to_ts=to_val)
-        return maybe_human(r, fmt_metrics, human, meta={"query": dd_query})
+        payload = _shape_metrics(r.to_dict(), dd_query)
+        if human:
+            return Response(
+                content=fmt_metrics(payload["resp"]["series"], {"query": dd_query}),
+                media_type="text/plain",
+            )
+        return payload
     except Exception as e:
         raise HTTPException(status_code=502, detail=sanitize_error_message(str(e))) from e
 

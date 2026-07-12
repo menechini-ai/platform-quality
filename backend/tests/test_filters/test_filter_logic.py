@@ -48,7 +48,7 @@ def test_period_to_range_7d():
 
 def test_to_domain_kwargs_monitors_csv():
     kw = to_domain_kwargs("monitors", DatadogFilter(tags=["env:prod", "team:sre"], period="7d"))
-    assert kw["tags"] == "env:prod,team:sre"
+    assert kw["monitor_tags"] == "env:prod,team:sre"
     assert "from" not in kw  # monitors have no time window
 
 
@@ -65,7 +65,7 @@ def test_to_domain_kwargs_incidents_query():
 
 def test_to_domain_kwargs_logs_query_and_range():
     kw = to_domain_kwargs("logs", DatadogFilter(tags=["env:prod"], period="7d"))
-    assert kw["query"] == "tags:env:prod"
+    assert kw["query"] == "env:prod"
     assert kw["from"] and kw["to"]
 
 

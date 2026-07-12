@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from uuid import UUID  # noqa: TC003 — needed at runtime for FastAPI path param resolution
 
@@ -19,6 +20,7 @@ from app.core.schemas.incident import (
     TimelineEventCreate,
     TimelineEventRead,
 )
+from app.datadog.client import DatadogClient
 
 if TYPE_CHECKING:
     from app.auth.schemas import UserInfo
@@ -170,6 +172,127 @@ async def delete_incident(
         raise HTTPException(status_code=404, detail="Incident not found")
     await db.delete(incident)
     await db.flush()
+
+
+@router.post("/incidents/reconcile")
+async def reconcile_incidents(db: AsyncSession = Depends(get_db)):
+    """Remove local incidents whose Datadog source incident no longer exists.
+
+    Local incidents are linked to Datadog via ``dd_event_id``. When the source
+    incident is deleted in Datadog the local copy becomes a phantom; this prunes
+    those orphans so the UI stops showing incidents that no longer exist.
+    """
+    client = DatadogClient()
+    live_ids: set[str] = set()
+    page = 0
+    while True:
+        batch = client.list_incidents(page_size=100, page_number=page)
+        if not batch:
+            break
+        for i in batch:
+            inc_id = i.get("id")
+            if inc_id:
+                live_ids.add(str(inc_id))
+        if len(batch) < 100:
+            break
+        page += 1
+
+    result = await db.execute(select(Incident).where(Incident.dd_event_id.isnot(None)))
+    orphans = [inc for inc in result.scalars().all() if inc.dd_event_id not in live_ids]
+    for inc in orphans:
+        await db.delete(inc)
+    await db.commit()
+    return {"removed": len(orphans), "live_datadog_incidents": len(live_ids)}
+
+
+_VALID_SEVERITIES = {f"SEV-{i}" for i in range(1, 6)}
+_VALID_STATUSES = {"active", "stable", "resolved"}
+
+
+def _parse_dt(value: str | None) -> datetime:
+    if not value:
+        return datetime.now(UTC)
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return datetime.now(UTC)
+
+
+def _map_dd_incident(inc: dict) -> dict:
+    attr = inc.get("attributes", {}) or {}
+    severity = attr.get("severity")
+    if severity not in _VALID_SEVERITIES:
+        severity = "SEV-3"
+    status = attr.get("state")
+    if status not in _VALID_STATUSES:
+        status = "active"
+    return {
+        "dd_event_id": str(inc.get("id")),
+        "title": attr.get("title") or "Untitled incident",
+        "severity": severity,
+        "status": status,
+        "service": None,
+        "description": attr.get("customer_impact_scope"),
+        "dd_monitor_id": None,
+        "tags": None,
+        "started_at": _parse_dt(attr.get("created")),
+        "resolved_at": _parse_dt(attr.get("resolved")) if status == "resolved" else None,
+    }
+
+
+@router.post("/incidents/sync")
+async def sync_incidents_from_datadog(db: AsyncSession = Depends(get_db)):
+    """Mirror Datadog incidents into the local incidents table.
+
+    Datadog is the source of truth for incident existence; the local table is the
+    working copy that powers the Incidents page and the analysis/RCA features. New
+    incidents are created, existing ones (matched by ``dd_event_id``) are updated, and
+    local incidents linked to a Datadog incident that no longer exists are removed.
+    """
+    client = DatadogClient()
+    raw: list[dict] = []
+    page = 0
+    while True:
+        batch = client.list_incidents(page_size=100, page_number=page)
+        if not batch:
+            break
+        raw.extend(batch)
+        if len(batch) < 100:
+            break
+        page += 1
+
+    mapped = [_map_dd_incident(i) for i in raw]
+    live_ids = {m["dd_event_id"] for m in mapped}
+
+    existing = (
+        (await db.execute(select(Incident).where(Incident.dd_event_id.isnot(None)))).scalars().all()
+    )
+    by_dd = {inc.dd_event_id: inc for inc in existing}
+
+    created = updated = 0
+    for m in mapped:
+        current = by_dd.get(m["dd_event_id"])
+        if current is None:
+            db.add(Incident(**m))
+            created += 1
+        else:
+            for key, val in m.items():
+                if key != "dd_event_id":
+                    setattr(current, key, val)
+            updated += 1
+
+    orphans = [inc for inc in existing if inc.dd_event_id not in live_ids]
+    for inc in orphans:
+        await db.delete(inc)
+    removed = len(orphans)
+
+    await db.commit()
+    return {
+        "synced": len(mapped),
+        "created": created,
+        "updated": updated,
+        "removed": removed,
+    }
 
 
 # --- Timeline sub-resource ---
