@@ -17,6 +17,12 @@ from app.datadog_kit.collector import fetch_all
 from app.datadog_kit.config import DatadogKitConfig
 from app.datadog_kit.diagnosis import analyze
 from app.datadog_kit.models import InvestigationRequest, InvestigationRequestV3  # noqa: TC001
+from app.datadog_kit.playbook_executor import (
+    PlaybookExecutor,
+    PlaybookStep,
+    StepType,
+    build_playbook_from_runbook,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -169,6 +175,84 @@ async def investigate_v3(
     )
 
     return report
+
+
+@router.post("/playbooks/execute")
+async def execute_playbook(
+    request: dict,
+    dry_run: bool = True,
+    auto_confirm: bool = False,
+):
+    """Execute a playbook from runbook mitigation steps.
+
+    Body: { "runbook": {...}, "dry_run": true, "auto_confirm": false }
+    """
+    runbook = request.get("runbook")
+    if not runbook:
+        raise HTTPException(status_code=400, detail="runbook required")
+
+    steps = build_playbook_from_runbook(runbook)
+    executor = PlaybookExecutor(dry_run=dry_run, auto_confirm=auto_confirm)
+    execution = await executor.execute(steps)
+
+    return {
+        "overall_status": execution.overall_status.value,
+        "duration_seconds": execution.duration_seconds,
+        "steps": [
+            {
+                "step_name": s.step_name,
+                "status": s.status.value,
+                "output": s.output,
+                "error": s.error,
+                "duration_seconds": s.duration_seconds,
+            }
+            for s in execution.steps
+        ],
+    }
+
+
+@router.post("/playbooks/steps")
+async def execute_playbook_steps(
+    request: dict,
+    dry_run: bool = True,
+    auto_confirm: bool = False,
+):
+    """Execute custom playbook steps directly.
+
+    Body: {
+        "steps": [
+            {
+                "type": "kubectl|helm|scale_deployment|restart_deployment|flip_feature_flag|run_script|http_request",
+                "name": "step name",
+                "params": {...},
+                "requires_confirmation": true
+            }
+        ],
+        "dry_run": true
+    }
+    """
+    steps_data = request.get("steps", [])
+    if not steps_data:
+        raise HTTPException(status_code=400, detail="steps required")
+
+    steps = [PlaybookStep(**s) for s in steps_data]
+    executor = PlaybookExecutor(dry_run=dry_run, auto_confirm=auto_confirm)
+    execution = await executor.execute(steps)
+
+    return {
+        "overall_status": execution.overall_status.value,
+        "duration_seconds": execution.duration_seconds,
+        "steps": [
+            {
+                "step_name": s.step_name,
+                "status": s.status.value,
+                "output": s.output,
+                "error": s.error,
+                "duration_seconds": s.duration_seconds,
+            }
+            for s in execution.steps
+        ],
+    }
 
 
 @router.get("/investigate/{report_id}", response_model=RcaReportRead)

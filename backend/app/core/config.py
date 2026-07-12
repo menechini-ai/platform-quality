@@ -66,5 +66,11 @@ class Settings(BaseSettings):
     SIMILARITY_THRESHOLD: float = 0.75
     MAX_SIMILAR_INCIDENTS: int = 5
 
+    # --- Self-healing / Playbook Executor ---
+    SELF_HEALING_APPROVAL_REQUIRED: bool = True
+    SELF_HEALING_DRY_RUN_DEFAULT: bool = False
+    SELF_HEALING_MAX_PARALLEL_STEPS: int = 1
+    PLAYBOOK_DEFAULT_TIMEOUT_SECONDS: int = 300
+
 
 settings = Settings()
