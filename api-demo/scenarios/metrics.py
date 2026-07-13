@@ -21,11 +21,15 @@ def run_load_simulation(client: DdClient, service: str = "api-gateway") -> dict[
     for phase, vmin, vmax, steps, delay in phases:
         for step in range(steps):
             t = step / steps
-            rps = vmin + (vmax - vmin) * (1 - math.cos(t * math.pi / 2) if phase in ("ramp-up",) else t)
+            rps = vmin + (vmax - vmin) * (
+                1 - math.cos(t * math.pi / 2) if phase in ("ramp-up",) else t
+            )
             latency = random.gauss(100 + (100 - rps) * 0.5, 20)
             errors = max(0, random.gauss(0.02 * rps, 0.5))
 
-            results[f"metric_{client.send_metric(f'{service}.rps', rps, service)}"] = results.get(f"metric_{client.send_metric(f'{service}.rps', rps, service)}", 0) + 1
+            results[f"metric_{client.send_metric(f'{service}.rps', rps, service)}"] = (
+                results.get(f"metric_{client.send_metric(f'{service}.rps', rps, service)}", 0) + 1
+            )
             client.send_metric(f"{service}.latency", max(1, latency), service)
             client.send_metric(f"{service}.errors", int(errors), service, mtype="count")
             time.sleep(delay)

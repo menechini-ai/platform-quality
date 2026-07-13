@@ -63,7 +63,8 @@ class RedactionEngine:
                 result[k] = self.redact_dict(v)
             elif isinstance(v, list):
                 result[k] = [
-                    self.redact_dict(i) if isinstance(i, dict)
+                    self.redact_dict(i)
+                    if isinstance(i, dict)
                     else (self.redact(i) if isinstance(i, str) else i)
                     for i in v
                 ]

@@ -42,8 +42,7 @@ def _discover_tools() -> list[dict[str, Any]]:
             {
                 "name": cname,
                 "methods": [
-                    mname
-                    for mname, _ in inspect.getmembers(cls, inspect.iscoroutinefunction)
+                    mname for mname, _ in inspect.getmembers(cls, inspect.iscoroutinefunction)
                 ]
                 + [
                     mname
@@ -168,8 +167,6 @@ async def execute_method(module_name: str, class_name: str, method_name: str):
         result = method()
         # If it's a coroutine, await it
         if inspect.iscoroutine(result):
-            import asyncio
-
             result = await result
         return {"status": "ok", "result": str(result)[:2000]}
     except Exception as e:

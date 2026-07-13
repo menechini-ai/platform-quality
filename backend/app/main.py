@@ -120,9 +120,7 @@ def create_app() -> FastAPI:
     app.include_router(feedback_router, prefix=prefix, tags=["feedback"])
     app.include_router(admin_router, prefix=prefix, tags=["admin"])
     app.include_router(
-        webhook_incidents_router,
-        prefix="",
-        tags=["webhook-incidents"],
+        webhook_incidents_router, prefix="", tags=["webhook-incidents"]
     )  # No prefix for Versus compatibility
 
     @app.get("/health")

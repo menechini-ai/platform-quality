@@ -18,7 +18,9 @@ ERROR_TYPES = [
 ]
 
 
-def run_random_errors(client: DdClient, count: int = 20, service: str | None = None) -> dict[str, int]:
+def run_random_errors(
+    client: DdClient, count: int = 20, service: str | None = None
+) -> dict[str, int]:
     """Send a batch of random error types to populate Error Tracking."""
     svc = service or random.choice(["api-gateway", "payment-service", "user-service"])
     results = {}

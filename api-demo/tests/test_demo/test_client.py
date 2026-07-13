@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from client import APIS, API_NAMES, DdClient, _tags, _tag_list
+from client import API_NAMES, APIS, DdClient, _tag_list, _tags
 
 
 class TestApiRegistry:

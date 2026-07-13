@@ -17,7 +17,7 @@ import time
 # Add backend to path
 sys.path.insert(0, "/opt/data/workspace/observai/backend")
 
-from client import DdClient, APIS, API_NAMES
+from client import API_NAMES, APIS, DdClient
 
 
 def seed_all_services(dd: DdClient) -> dict[str, int]:
@@ -56,9 +56,9 @@ def seed_all_services(dd: DdClient) -> dict[str, int]:
 
         # Send logs
         for msg, lvl in [
-            (f"Request processed OK", "info"),
-            (f"Slow query detected on /api/users", "warn"),
-            (f"Connection timeout to downstream", "error"),
+            ("Request processed OK", "info"),
+            ("Slow query detected on /api/users", "warn"),
+            ("Connection timeout to downstream", "error"),
         ]:
             svc_client.send_log(msg, lvl)
             results["logs"] += 1
@@ -98,7 +98,9 @@ def seed_all_services(dd: DdClient) -> dict[str, int]:
 def run_scenario(dd: DdClient, scenario: str) -> dict:
     """Run a specific SRE scenario from sre_engine.py."""
     # Import sre_engine's DdClient and scenario runner
-    from sre_engine import SCENARIOS, run_scenario as run_sre_scenario, DdClient as SreDdClient
+    from sre_engine import SCENARIOS
+    from sre_engine import DdClient as SreDdClient
+    from sre_engine import run_scenario as run_sre_scenario
 
     if scenario not in SCENARIOS:
         print(f"❌ Unknown scenario: {scenario}")
@@ -120,15 +122,24 @@ def main():
     parser.add_argument("--api-key", help="Datadog API Key")
     parser.add_argument("--app-key", help="Datadog Application Key")
     parser.add_argument("--site", default="us5.datadoghq.com", help="Datadog site")
-    parser.add_argument("--seed-only", action="store_true", help="Only seed test data, don't run scenarios")
-    parser.add_argument("--scenario", choices=["deploy", "resource", "latency", "dependency", "data_corruption", "all"],
-                        default="deploy", help="SRE scenario to run")
-    parser.add_argument("--list-scenarios", action="store_true", help="List available scenarios and exit")
+    parser.add_argument(
+        "--seed-only", action="store_true", help="Only seed test data, don't run scenarios"
+    )
+    parser.add_argument(
+        "--scenario",
+        choices=["deploy", "resource", "latency", "dependency", "data_corruption", "all"],
+        default="deploy",
+        help="SRE scenario to run",
+    )
+    parser.add_argument(
+        "--list-scenarios", action="store_true", help="List available scenarios and exit"
+    )
 
     args = parser.parse_args()
 
     if args.list_scenarios:
         from sre_engine import SCENARIOS
+
         print("\nAvailable SRE Scenarios:")
         for name, cfg in SCENARIOS.items():
             print(f"  {name:20} {cfg['title']} ({cfg['severity']})")
@@ -149,6 +160,7 @@ def main():
     # Run scenario
     if args.scenario == "all":
         from sre_engine import SCENARIOS
+
         for name in SCENARIOS.keys():
             run_scenario(dd, name)
             time.sleep(2)  # Brief pause between scenarios

@@ -22,7 +22,9 @@ class TestEvaluatePipeline:
     @pytest.mark.asyncio
     async def test_returns_report_with_accuracy(self) -> None:
         mock_reasoning = AsyncMock()
-        mock_reasoning.ainvoke.return_value = type("", (), {"content": "Database connection pool exhausted"})()
+        mock_reasoning.ainvoke.return_value = type(
+            "", (), {"content": "Database connection pool exhausted"}
+        )()
         mock_tool = AsyncMock()
         mock_tool.ainvoke.return_value = type("", (), {"content": "Restore database"})()
         patches = (
@@ -36,7 +38,12 @@ class TestEvaluatePipeline:
                 "recommendation": "Restore database",
             }
             incidents = [
-                {"id": "inc-1", "title": "DB down", "description": "db connection issue", "expected_root_cause": "Database connection pool"},
+                {
+                    "id": "inc-1",
+                    "title": "DB down",
+                    "description": "db connection issue",
+                    "expected_root_cause": "Database connection pool",
+                },
             ]
             report = await evaluate_pipeline(incidents)
 

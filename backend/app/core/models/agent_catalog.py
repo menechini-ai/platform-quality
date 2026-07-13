@@ -28,9 +28,7 @@ class PatternCatalog(Base):
         Index("ix_pattern_catalog_signature", "signature"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     source_name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
     rule_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     signature: Mapped[str] = mapped_column(String(500), nullable=False, index=True)
@@ -68,9 +66,7 @@ class AgentIncident(Base):
 
     __tablename__ = "agent_incidents"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     pattern_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("pattern_catalog.id"), nullable=False
     )
@@ -86,9 +82,7 @@ class AgentIncident(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
-    acknowledged_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=dict)
 
@@ -105,9 +99,7 @@ class AgentSourceCursor(Base):
 
     __tablename__ = "agent_source_cursors"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     source_name: Mapped[str] = mapped_column(String(200), nullable=False, unique=True)
     source_type: Mapped[str] = mapped_column(String(50), nullable=False)
     cursor_data: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)

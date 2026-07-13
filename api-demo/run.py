@@ -19,7 +19,7 @@ import sys
 import time
 from typing import Any
 
-from client import DdClient, APIS, API_NAMES
+from client import API_NAMES, APIS, DdClient
 
 
 def send_data(client: DdClient, iterations: int = 5, delay: float = 1.0) -> dict[str, int]:
@@ -29,11 +29,13 @@ def send_data(client: DdClient, iterations: int = 5, delay: float = 1.0) -> dict
         res: list[int] = []
         res += client.send_logs(random.randint(1, 5))
         res += client.send_metrics()
-        res.append(client.send_event(
-            f"[{client.api_name}] Demo #{i}",
-            f"Iteration {i} for {client.api_name}",
-            random.choice(["info", "warning", "error"]),
-        ))
+        res.append(
+            client.send_event(
+                f"[{client.api_name}] Demo #{i}",
+                f"Iteration {i} for {client.api_name}",
+                random.choice(["info", "warning", "error"]),
+            )
+        )
         for c in res:
             if str(c).startswith("2"):
                 ok += 1
@@ -89,20 +91,22 @@ def create_slos(client: DdClient, monitor_ids: list[int]) -> dict[str, Any]:
     s = client.create_slo(
         f"ObservAI — {svc} Uptime SLO (99.5%)",
         monitor_ids,
-        target=99.5, warning=99.0,
+        target=99.5,
+        warning=99.0,
     )
     if s:
         slos.append(s)
-        print(f"  ✓ SLO Uptime: created")
+        print("  ✓ SLO Uptime: created")
 
     s = client.create_slo(
         f"ObservAI — {svc} Performance SLO (99%)",
         monitor_ids,
-        target=99.0, warning=98.5,
+        target=99.0,
+        warning=98.5,
     )
     if s:
         slos.append(s)
-        print(f"  ✓ SLO Performance: created")
+        print("  ✓ SLO Performance: created")
 
     return {"slos": len(slos)}
 
@@ -137,11 +141,12 @@ def create_incident(client: DdClient) -> dict[str, Any]:
 def send_error_tracking(client: DdClient) -> dict[str, int]:
     """Send error tracking events."""
     import random as rnd
+
     kinds = ["ValueError", "TimeoutError", "KeyError", "PermissionError", "ConnectionError"]
     ok = 0
     for _ in range(5):
         code = client.send_error_tracking_event(
-            f"Error in {client._svc()}: {rnd.choice(['timeout','invalid input','access denied'])}",
+            f"Error in {client._svc()}: {rnd.choice(['timeout', 'invalid input', 'access denied'])}",
             rnd.choice(kinds),
         )
         if str(code).startswith("2"):
@@ -151,6 +156,7 @@ def send_error_tracking(client: DdClient) -> dict[str, int]:
 
 # ── Main ───────────────────────────────────────────────────────
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="ObservAI — Datadog API Demo Lab")
     parser.add_argument("--api-key", default=os.environ.get("DATADOG_API_KEY", ""))
@@ -159,8 +165,15 @@ def main() -> None:
     parser.add_argument("--iter", type=int, default=5, help="Iterations per API")
     parser.add_argument("--delay", type=float, default=1.0, help="Delay between iterations")
     parser.add_argument("--api", "-a", choices=API_NAMES, help="Single API (default: all)")
-    parser.add_argument("--create", "-c", choices=["monitors", "slos", "synthetics", "incidents", "all"], help="Create resources")
-    parser.add_argument("--send", action="store_true", default=True, help="Send test data (default: on)")
+    parser.add_argument(
+        "--create",
+        "-c",
+        choices=["monitors", "slos", "synthetics", "incidents", "all"],
+        help="Create resources",
+    )
+    parser.add_argument(
+        "--send", action="store_true", default=True, help="Send test data (default: on)"
+    )
     args = parser.parse_args()
 
     if not args.api_key:
@@ -170,9 +183,9 @@ def main() -> None:
     apis = [args.api] if args.api else API_NAMES
 
     for name in apis:
-        print(f"\n{'='*50}")
+        print(f"\n{'=' * 50}")
         print(f"  {name}  ({APIS[name]})")
-        print(f"{'='*50}")
+        print(f"{'=' * 50}")
 
         with DdClient(args.api_key, args.app_key, args.site, api_name=name) as client:
             # Send data

@@ -5,7 +5,7 @@ from __future__ import annotations
 import random
 import time
 
-from client import DdClient, ERROR_MSGS, STATUSES
+from client import ERROR_MSGS, DdClient
 
 # Patterns for realistic log scenarios
 SCENARIOS = {
@@ -39,7 +39,9 @@ SCENARIOS = {
 
 def run_log_burst(client: DdClient, count: int = 50, service: str | None = None) -> dict[str, int]:
     """Send a burst of log entries mimicking real traffic patterns."""
-    svc = service or random.choice(["api-gateway", "user-service", "payment-service", "order-service"])
+    svc = service or random.choice(
+        ["api-gateway", "user-service", "payment-service", "order-service"]
+    )
     env = random.choice(["prod", "staging"])
     results = {}
 

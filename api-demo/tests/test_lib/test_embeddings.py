@@ -89,9 +89,7 @@ class TestEmbedText:
 
     def test_embed_text_empty_string(self) -> None:
         mock_client = MagicMock()
-        mock_client.embeddings.create.return_value = MagicMock(
-            data=[MagicMock(embedding=[])]
-        )
+        mock_client.embeddings.create.return_value = MagicMock(data=[MagicMock(embedding=[])])
         with patch("lib.embeddings.OpenAI", return_value=mock_client):
             result = embed_text("")
         assert isinstance(result, list)

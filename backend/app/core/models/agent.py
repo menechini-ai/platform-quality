@@ -60,7 +60,7 @@ class ElasticsearchSourceConfig(BaseModel):
     password: str | None = None
     index: str
     time_field: str = "@timestamp"
-    query: str = 'log.level:(error OR warn)'
+    query: str = "log.level:(error OR warn)"
     message_field: str = "message"
     page_size: int = 500
 

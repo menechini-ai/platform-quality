@@ -6,8 +6,6 @@ import json
 import tempfile
 from unittest.mock import patch
 
-import pytest
-
 from lib.vectordb import VectorStore
 
 

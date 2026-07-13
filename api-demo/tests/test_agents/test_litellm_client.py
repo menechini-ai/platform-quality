@@ -19,9 +19,7 @@ class TestLiteLLMClientInit:
         client = LiteLLMClient()
         assert client.default_model == "gpt-4o"
 
-    def test_explicit_constructor_overrides_env(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_explicit_constructor_overrides_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("LITELLM_DEFAULT_MODEL", "gpt-4o")
         client = LiteLLMClient(default_model="anthropic/claude-3-opus")
         assert client.default_model == "anthropic/claude-3-opus"
@@ -48,9 +46,7 @@ class TestLiteLLMClientComplete:
 
     def test_complete_with_system_prompt(self) -> None:
         with patch("agents.litellm_client.completion") as mock_comp:
-            mock_comp.return_value = MagicMock(
-                choices=[MagicMock(message=MagicMock(content="ok"))]
-            )
+            mock_comp.return_value = MagicMock(choices=[MagicMock(message=MagicMock(content="ok"))])
             client = LiteLLMClient()
             client.complete("hello", system_prompt="Be concise")
         messages = mock_comp.call_args[1]["messages"]
@@ -59,18 +55,14 @@ class TestLiteLLMClientComplete:
 
     def test_complete_custom_model(self) -> None:
         with patch("agents.litellm_client.completion") as mock_comp:
-            mock_comp.return_value = MagicMock(
-                choices=[MagicMock(message=MagicMock(content="ok"))]
-            )
+            mock_comp.return_value = MagicMock(choices=[MagicMock(message=MagicMock(content="ok"))])
             client = LiteLLMClient()
             client.complete("hello", model="anthropic/claude-3-opus")
         assert mock_comp.call_args[1]["model"] == "anthropic/claude-3-opus"
 
     def test_complete_passes_api_key_from_client(self) -> None:
         with patch("agents.litellm_client.completion") as mock_comp:
-            mock_comp.return_value = MagicMock(
-                choices=[MagicMock(message=MagicMock(content="ok"))]
-            )
+            mock_comp.return_value = MagicMock(choices=[MagicMock(message=MagicMock(content="ok"))])
             client = LiteLLMClient(api_key="sk-test-key")
             client.complete("hello")
         assert mock_comp.call_args[1]["api_key"] == "sk-test-key"
@@ -93,6 +85,7 @@ class TestLiteLLMClientKbSearch:
 
     def test_kb_search_with_vector_store(self) -> None:
         from lib.vectordb import VectorStore
+
         vs = VectorStore()
         vs.add_entry("kb-001", "Deploy rollback procedure", embedding=[1.0, 0.0])
         vs.add_entry("kb-002", "Database tuning", embedding=[0.0, 1.0])
@@ -106,6 +99,7 @@ class TestLiteLLMClientKbSearch:
 
     def test_complete_inject_kb_adds_context(self) -> None:
         from lib.vectordb import VectorStore
+
         vs = VectorStore()
         vs.add_entry("kb-001", "Deploy rollback procedure", embedding=[1.0, 0.0])
         client = LiteLLMClient()
@@ -138,9 +132,7 @@ class TestLegacyLlmComplete:
 
     def test_includes_system_prompt(self) -> None:
         with patch("agents.litellm_client.completion") as mock_comp:
-            mock_comp.return_value = MagicMock(
-                choices=[MagicMock(message=MagicMock(content="ok"))]
-            )
+            mock_comp.return_value = MagicMock(choices=[MagicMock(message=MagicMock(content="ok"))])
             llm_complete("hello", system_prompt="Be concise")
         messages = mock_comp.call_args[1]["messages"]
         assert messages[0] == {"role": "system", "content": "Be concise"}

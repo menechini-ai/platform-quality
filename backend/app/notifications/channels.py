@@ -90,11 +90,14 @@ class SlackChannel(NotificationChannel):
         ]
 
         if payload.tags:
-            tags_text = " ".join(f"`{t}`" for t in payload.tags[:10])
-            blocks.append({
-                "type": "context",
-                "elements": [{"type": "mrkdwn", "text": tags_text}],
-            })
+            blocks.append(
+                {
+                    "type": "context",
+                    "elements": [
+                        {"type": "mrkdwn", "text": " ".join(f"`{t}`" for t in payload.tags[:10])}
+                    ],
+                }
+            )
 
         if payload.actions:
             blocks.append({"type": "actions", "elements": payload.actions})
@@ -147,12 +150,14 @@ class TeamsChannel(NotificationChannel):
             "@context": "http://schema.org/extensions",
             "themeColor": color,
             "summary": payload.title,
-            "sections": [{
-                "activityTitle": f"🚨 {payload.title}",
-                "activitySubtitle": f"Incident from {payload.source}",
-                "facts": facts,
-                "text": payload.message[:2000],
-            }],
+            "sections": [
+                {
+                    "activityTitle": f"🚨 {payload.title}",
+                    "activitySubtitle": f"Incident from {payload.source}",
+                    "facts": facts,
+                    "text": payload.message[:2000],
+                }
+            ],
         }
 
         if payload.actions:
@@ -280,11 +285,14 @@ class OpsgenieChannel(NotificationChannel):
         }
 
         try:
-            headers = {
-                "Authorization": f"GenieKey {self.api_key}",
-                "Content-Type": "application/json",
-            }
-            resp = await self._client.post(self.api_url, json=alert, headers=headers)
+            resp = await self._client.post(
+                self.api_url,
+                json=alert,
+                headers={
+                    "Authorization": f"GenieKey {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+            )
             resp.raise_for_status()
             return True
         except Exception as e:
@@ -332,13 +340,13 @@ class EmailChannel(NotificationChannel):
 Title: {payload.title}
 Severity: {payload.severity}
 Source: {payload.source}
-Service: {payload.incident.service or 'N/A'}
-Time: {payload.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}
+Service: {payload.incident.service or "N/A"}
+Time: {payload.timestamp.strftime("%Y-%m-%d %H:%M:%S UTC")}
 
 Description:
 {payload.message}
 
-Tags: {', '.join(payload.tags or [])}
+Tags: {", ".join(payload.tags or [])}
 Incident ID: {payload.incident.id}
 """
         msg.attach(MIMEText(body, "plain"))
@@ -442,14 +450,16 @@ async def init_notifications(config: dict) -> NotificationManager:
     # Email
     email = config.get("notifications", {}).get("email", {})
     if email.get("smtp_host") and email.get("to_emails"):
-        manager.add_channel(EmailChannel(
-            smtp_host=email["smtp_host"],
-            smtp_port=email.get("smtp_port", 587),
-            username=email["username"],
-            password=email["password"],
-            from_email=email["from_email"],
-            to_emails=email["to_emails"],
-            use_tls=email.get("use_tls", True),
-        ))
+        manager.add_channel(
+            EmailChannel(
+                smtp_host=email["smtp_host"],
+                smtp_port=email.get("smtp_port", 587),
+                username=email["username"],
+                password=email["password"],
+                from_email=email["from_email"],
+                to_emails=email["to_emails"],
+                use_tls=email.get("use_tls", True),
+            )
+        )
 
     return manager

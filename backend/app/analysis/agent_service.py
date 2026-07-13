@@ -133,9 +133,7 @@ class AgentService:
         elif source.type == LogSourceType.ELASTICSEARCH:
             await self._process_es_source(source, cursor)
 
-    async def _process_file_source(
-        self, source: LogSource, cursor: SourceCursor | None
-    ) -> None:
+    async def _process_file_source(self, source: LogSource, cursor: SourceCursor | None) -> None:
         """Read new lines from file source."""
         if not source.file:
             return
@@ -159,18 +157,14 @@ class AgentService:
                 continue
             await self._process_line(line, source.name, source)
 
-    async def _process_es_source(
-        self, source: LogSource, cursor: SourceCursor | None
-    ) -> None:
+    async def _process_es_source(self, source: LogSource, cursor: SourceCursor | None) -> None:
         """Query Elasticsearch for new log entries."""
         if not source.elasticsearch:
             return
 
         es = source.elasticsearch
         url = f"{es.addresses[0]}/{es.index}/_search"
-        auth: tuple[str, str] | None = None
-        if es.username and es.password:
-            auth = (es.username, es.password)
+        auth = (es.username, es.password) if es.username else None
 
         query = {
             "size": es.page_size,
@@ -178,15 +172,7 @@ class AgentService:
                 "bool": {
                     "must": [{"query_string": {"query": es.query}}],
                     "filter": [
-                        {
-                            "range": {
-                                es.time_field: {
-                                    "gt": cursor.last_timestamp
-                                    if cursor and cursor.last_timestamp
-                                    else "now-1h"
-                                }
-                            }
-                        }
+                        {"range": {es.time_field: {"gt": cursor.last_timestamp or "now-1h"}}}
                     ],
                 }
             },
@@ -204,7 +190,7 @@ class AgentService:
             if msg:
                 await self._process_line(msg, source.name, source)
 
-        if cursor and cursor.last_timestamp:
+        if hits:
             cursor.last_timestamp = hits[-1]["_source"].get(es.time_field)
 
     async def _process_line(self, line: str, source_name: str, source: LogSource) -> None:
@@ -217,7 +203,7 @@ class AgentService:
             return
 
         # 3. Feed to miner
-        sig_hash = self.miner.insert(redacted, source_name, source.rule_name or "")
+        sig_hash = self.miner.insert(redacted, source_name, source.rule_name)
 
         # 4. In detect mode, check if pattern is new
         if self.mode == AgentMode.DETECT:
@@ -228,8 +214,6 @@ class AgentService:
 
     def _matches_regex_filter(self, line: str) -> bool:
         """Check if line matches any regex rule or default pattern."""
-        if not self.config or not self.config.regex:
-            return True
         rules = self.config.regex.rules
         default = self.config.regex.default_pattern
 
@@ -242,9 +226,7 @@ class AgentService:
 
         return not (rules or default)  # If no rules, match all
 
-    async def _create_incident_from_pattern(
-        self, pattern: dict, source_name: str
-    ) -> None:
+    async def _create_incident_from_pattern(self, pattern: dict, source_name: str) -> None:
         """Create incident for previously unseen pattern."""
         async with async_session_factory() as session:
             incident = Incident(
@@ -276,9 +258,7 @@ class AgentService:
             session.add(timeline)
             await session.commit()
 
-            logger.warning(
-                "Created incident %s for new pattern %s", incident.id, pattern["hash"]
-            )
+            logger.warning("Created incident %s for new pattern %s", incident.id, pattern["hash"])
 
     def get_stats(self) -> dict:
         """Get agent statistics."""

@@ -20,8 +20,9 @@ from app.core.config import settings  # noqa: E402
 from app.core.db import Base  # noqa: E402
 
 config = context.config
-url = settings.DATABASE_URL.replace("+asyncpg", "").replace("+aiosqlite", "")
-config.set_main_option("sqlalchemy.url", url)
+config.set_main_option(
+    "sqlalchemy.url", settings.DATABASE_URL.replace("+asyncpg", "").replace("+aiosqlite", "")
+)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

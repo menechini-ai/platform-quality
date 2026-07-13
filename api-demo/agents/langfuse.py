@@ -51,7 +51,7 @@ class _TraceContext:
         if self._enabled:
             self._records.append(data)
 
-    def __enter__(self) -> "_TraceContext":
+    def __enter__(self) -> _TraceContext:
         if self._enabled:
             self._records = [{"event": "start", "name": self.name, **self._tags}]
         return self

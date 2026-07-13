@@ -16,12 +16,15 @@ from typing import Any
 
 from agents.tool_budget import ToolBudget
 
-
 # ── Internal Data ──────────────────────────────────────────────────────
 
 _KB_ENTRIES: list[dict[str, str]] = [
     {"id": "kb-001", "title": "Deploy rollback", "summary": "kubectl rollout undo deployment/app"},
-    {"id": "kb-002", "title": "Database recovery", "summary": "Restore from latest pg_dump snapshot"},
+    {
+        "id": "kb-002",
+        "title": "Database recovery",
+        "summary": "Restore from latest pg_dump snapshot",
+    },
     {"id": "kb-003", "title": "Certificate renewal", "summary": "certbot renew --force-renewal"},
 ]
 
@@ -33,6 +36,7 @@ _INCIDENTS: list[dict[str, str]] = [
 
 
 # ── Internal Tool Handlers ─────────────────────────────────────────────
+
 
 def _search_kb(query: str) -> list[dict[str, str]]:
     q = query.lower()
@@ -77,6 +81,7 @@ def configure_budget(max_calls: int = 10, window_seconds: int = 60) -> None:
 
 
 # ── Public API ─────────────────────────────────────────────────────────
+
 
 def list_tools() -> list[dict[str, Any]]:
     """Return tool metadata (name + description + parameters)."""
@@ -141,7 +146,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     configure_budget(max_calls=args.max_calls, window_seconds=args.window)
-    print(f"MCP demo server configured on port {args.port} with budget ({args.max_calls}/{args.window}s)")
+    print(
+        f"MCP demo server configured on port {args.port} with budget ({args.max_calls}/{args.window}s)"
+    )
     print("Available tools:", [t["name"] for t in list_tools()])
     print()
 

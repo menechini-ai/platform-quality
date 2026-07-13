@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import time
 from unittest.mock import patch
 
 from agents.tool_budget import ToolBudget
@@ -27,7 +26,7 @@ class TestToolBudget:
         with patch("time.time", side_effect=[100.0, 100.0, 115.0]):
             assert budget.allow_call() is True
             assert budget.allow_call() is False  # still within window
-            assert budget.allow_call() is True   # outside window
+            assert budget.allow_call() is True  # outside window
 
     def test_reset_clears_timestamps(self) -> None:
         budget = ToolBudget(max_calls=1, window_seconds=60)

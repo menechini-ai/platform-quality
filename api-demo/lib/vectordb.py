@@ -37,12 +37,14 @@ class VectorStore:
         """Add an entry, computing its embedding if not provided."""
         if embedding is None:
             embedding = embed_text(text)
-        self._entries.append({
-            "id": entry_id,
-            "text": text,
-            "metadata": metadata or {},
-            "embedding": embedding,
-        })
+        self._entries.append(
+            {
+                "id": entry_id,
+                "text": text,
+                "metadata": metadata or {},
+                "embedding": embedding,
+            }
+        )
 
     def search(self, query: str, k: int = 3) -> list[dict[str, Any]]:
         """Return top-K entries most similar to the query."""

@@ -12,7 +12,6 @@ from typing import Any
 import numpy as np
 from openai import OpenAI
 
-
 DEFAULT_EMBED_MODEL = os.getenv("EMBED_MODEL", "text-embedding-3-small")
 
 

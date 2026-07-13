@@ -15,8 +15,8 @@ from typing_extensions import TypedDict
 
 from agents.dual_llm import get_reasoning_model, get_tool_model
 
-
 # ── State ──────────────────────────────────────────────────────────────
+
 
 class AgentState(TypedDict):
     messages: list[dict[str, str]]
@@ -26,6 +26,7 @@ class AgentState(TypedDict):
 
 
 # ── Nodes ──────────────────────────────────────────────────────────────
+
 
 async def triage_incident(state: AgentState) -> dict[str, Any]:
     llm = get_reasoning_model()
@@ -46,6 +47,7 @@ def should_continue(state: AgentState) -> Literal["generate_recommendation", "__
 
 
 # ── Graph ──────────────────────────────────────────────────────────────
+
 
 def build_pipeline() -> StateGraph:
     graph = StateGraph(AgentState)

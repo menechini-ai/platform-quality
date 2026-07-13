@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import math
 import os
 import random
 import time
@@ -9,7 +8,7 @@ import uuid
 from typing import Any
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
 DD_API_KEY = os.environ.get("DATADOG_API_KEY", "")
@@ -30,7 +29,7 @@ SANDBOX_MONITORS = [
         "id": "health",
         "name": "Health Check",
         "type": "query alert",
-        "query_tpl": 'avg(last_5m):avg:{metric_svc}.health{{service:{service},env:{env}}} < 1',
+        "query_tpl": "avg(last_5m):avg:{metric_svc}.health{{service:{service},env:{env}}} < 1",
         "message_tpl": "API {service} ({env}) health check failing — service not reporting",
         "thresholds": {"critical": 1.0},
     },
@@ -38,7 +37,7 @@ SANDBOX_MONITORS = [
         "id": "latency",
         "name": "High Latency",
         "type": "query alert",
-        "query_tpl": 'avg(last_5m):avg:{metric_svc}.latency_ms{{service:{service},env:{env}}} > 500',
+        "query_tpl": "avg(last_5m):avg:{metric_svc}.latency_ms{{service:{service},env:{env}}} > 500",
         "message_tpl": "API {service} ({env}) latency above 500ms",
         "thresholds": {"critical": 500, "warning": 300},
     },
@@ -46,7 +45,7 @@ SANDBOX_MONITORS = [
         "id": "error_rate",
         "name": "High Error Rate",
         "type": "query alert",
-        "query_tpl": 'avg(last_5m):avg:{metric_svc}.error_rate{{service:{service},env:{env}}} > 0.05',
+        "query_tpl": "avg(last_5m):avg:{metric_svc}.error_rate{{service:{service},env:{env}}} > 0.05",
         "message_tpl": "API {service} ({env}) error rate above 5%",
         "thresholds": {"critical": 0.05, "warning": 0.02},
     },
@@ -54,7 +53,7 @@ SANDBOX_MONITORS = [
         "id": "no_traffic",
         "name": "No Traffic",
         "type": "query alert",
-        "query_tpl": 'avg(last_5m):avg:{metric_svc}.request_count{{service:{service},env:{env}}} < 1',
+        "query_tpl": "avg(last_5m):avg:{metric_svc}.request_count{{service:{service},env:{env}}} < 1",
         "message_tpl": "API {service} ({env}) receiving no traffic",
         "thresholds": {"critical": 1, "warning": 5},
     },
@@ -62,7 +61,7 @@ SANDBOX_MONITORS = [
         "id": "cpu",
         "name": "High CPU Usage",
         "type": "query alert",
-        "query_tpl": 'avg(last_5m):avg:{metric_svc}.cpu_usage{{service:{service},env:{env}}} > 90',
+        "query_tpl": "avg(last_5m):avg:{metric_svc}.cpu_usage{{service:{service},env:{env}}} > 90",
         "message_tpl": "API {service} ({env}) CPU usage above 90%",
         "thresholds": {"critical": 90, "warning": 75},
     },
@@ -97,19 +96,23 @@ def _dd_headers() -> dict[str, str]:
     return h
 
 
-async def _dd_delete(c: "httpx.AsyncClient", url: str, headers: dict) -> bool:
+async def _dd_delete(c: httpx.AsyncClient, url: str, headers: dict) -> bool:
     # Retry on rate-limit/5xx so bulk cleanup never leaves resources behind.
     for attempt in range(6):
         try:
             dr = await c.delete(url, headers=headers)
         except Exception:
-            await asyncio.sleep(min(2 ** attempt, 8))
+            await asyncio.sleep(min(2**attempt, 8))
             continue
         if dr.status_code in (200, 204, 404):
             return True
         if dr.status_code in (429, 500, 502, 503, 504):
             retry_after = dr.headers.get("retry-after")
-            wait = float(retry_after) if (retry_after and retry_after.isdigit()) else min(2 ** attempt, 8) + random.uniform(0, 1)
+            wait = (
+                float(retry_after)
+                if (retry_after and retry_after.isdigit())
+                else min(2**attempt, 8) + random.uniform(0, 1)
+            )
             await asyncio.sleep(wait)
             continue
         return False
@@ -139,7 +142,7 @@ def _session_tag() -> str:
     return f"sandbox_session:{CURRENT_SANDBOX_SESSION}" if CURRENT_SANDBOX_SESSION else ""
 
 
-async def _delete_sandbox_infra(c: "httpx.AsyncClient", headers: dict) -> None:
+async def _delete_sandbox_infra(c: httpx.AsyncClient, headers: dict) -> None:
     # Datadog allows duplicate monitor names, so each run would otherwise pile up.
     # Wipe existing [Sandbox] SLOs + monitors for a clean slate before creating.
     # SLOs first: a monitor linked to an SLO cannot be deleted (Datadog 400).
@@ -170,7 +173,10 @@ async def _delete_sandbox_infra(c: "httpx.AsyncClient", headers: dict) -> None:
 
 
 def _sandbox_api_list() -> list[dict[str, str]]:
-    return [{"label": f"{s['name']} — {s['env']}", "service": s["name"], "env": s["env"]} for s in API_SERVICES]
+    return [
+        {"label": f"{s['name']} — {s['env']}", "service": s["name"], "env": s["env"]}
+        for s in API_SERVICES
+    ]
 
 
 def _metric_prefix(service: str) -> str:
@@ -604,13 +610,36 @@ async def sandbox_create(body: dict[str, Any] = {}):
                     )
                     body = r.json()
                     if r.status_code in (200, 201):
-                        created.append({"service": svc, "env": env, "monitor": mon["name"], "status": "created", "id": body.get("id")})
+                        created.append(
+                            {
+                                "service": svc,
+                                "env": env,
+                                "monitor": mon["name"],
+                                "status": "created",
+                                "id": body.get("id"),
+                            }
+                        )
                         if mon["id"] == "health":
                             health_monitor_ids[f"{svc}|{env}"] = body.get("id")
-                    elif "duplicate" in (body.get("errors", [""])[0] if isinstance(body.get("errors"), list) else str(body.get("errors", ""))).lower():
+                    elif (
+                        "duplicate"
+                        in (
+                            body.get("errors", [""])[0]
+                            if isinstance(body.get("errors"), list)
+                            else str(body.get("errors", ""))
+                        ).lower()
+                    ):
                         duplicates += 1
-                        err_str = body.get("errors", [""])[0] if isinstance(body.get("errors"), list) else str(body.get("errors", ""))
-                        dup_id = err_str.split("monitor_id:")[-1].split()[0] if "monitor_id:" in err_str else None
+                        err_str = (
+                            body.get("errors", [""])[0]
+                            if isinstance(body.get("errors"), list)
+                            else str(body.get("errors", ""))
+                        )
+                        dup_id = (
+                            err_str.split("monitor_id:")[-1].split()[0]
+                            if "monitor_id:" in err_str
+                            else None
+                        )
                         if dup_id and dup_id.isdigit():
                             dup_id = int(dup_id)
                         # Ensure the reused monitor carries the session tag for scoping.
@@ -623,15 +652,39 @@ async def sandbox_create(body: dict[str, Any] = {}):
                                 )
                             except Exception:
                                 pass
-                        created.append({"service": svc, "env": env, "monitor": mon["name"], "status": "exists", "id": dup_id})
+                        created.append(
+                            {
+                                "service": svc,
+                                "env": env,
+                                "monitor": mon["name"],
+                                "status": "exists",
+                                "id": dup_id,
+                            }
+                        )
                         if mon["id"] == "health":
                             health_monitor_ids[f"{svc}|{env}"] = dup_id
                     else:
                         errors += 1
-                        created.append({"service": svc, "env": env, "monitor": mon["name"], "status": "error", "detail": r.text[:120]})
+                        created.append(
+                            {
+                                "service": svc,
+                                "env": env,
+                                "monitor": mon["name"],
+                                "status": "error",
+                                "detail": r.text[:120],
+                            }
+                        )
                 except Exception as e:
                     errors += 1
-                    created.append({"service": svc, "env": env, "monitor": mon["name"], "status": "error", "detail": str(e)})
+                    created.append(
+                        {
+                            "service": svc,
+                            "env": env,
+                            "monitor": mon["name"],
+                            "status": "error",
+                            "detail": str(e),
+                        }
+                    )
                 await asyncio.sleep(0.3)
         # ── Create monitor-based SLOs (availability) ──
         slos = 0
@@ -651,7 +704,8 @@ async def sandbox_create(body: dict[str, Any] = {}):
                     "description": f"Availability SLO for {svc} in {env} environment",
                     "thresholds": [{"target": 99.0, "timeframe": "7d", "warning": 99.5}],
                     "monitor_ids": [mon_id],
-                    "tags": [f"service:{svc}", f"env:{env}", "team:observai", "purpose:sandbox"] + ([_session_tag()] if _session_tag() else []),
+                    "tags": [f"service:{svc}", f"env:{env}", "team:observai", "purpose:sandbox"]
+                    + ([_session_tag()] if _session_tag() else []),
                 }
                 r = await c.post(
                     f"{DD_API_BASE}/api/v1/slo",
@@ -709,7 +763,7 @@ async def sandbox_cleanup(body: dict[str, Any] = {}):
                     else:
                         errors += 1
                     await asyncio.sleep(0.1)
-        except Exception as e:
+        except Exception:
             errors += 1
 
         # ── 3. Resolve sandbox incidents ──
@@ -757,8 +811,10 @@ async def sandbox_cleanup(body: dict[str, Any] = {}):
                     except Exception:
                         errors += 1
                     await asyncio.sleep(0.1)
-                offset = (body.get("meta") or {}).get("pagination", {}).get("next_offset", offset + 100)
-        except Exception as e:
+                offset = (
+                    (body.get("meta") or {}).get("pagination", {}).get("next_offset", offset + 100)
+                )
+        except Exception:
             errors += 1
 
         # ── 2. Delete sandbox monitors (after SLOs so health monitors are no longer SLO-linked) ──
@@ -780,7 +836,14 @@ async def sandbox_cleanup(body: dict[str, Any] = {}):
         except Exception as e:
             return {"status": "error", "error": str(e)}
 
-    return {"status": "ok", "deleted": deleted, "resolved": resolved, "slos_deleted": deleted_slos, "errors": errors, "total_found": deleted + errors}
+    return {
+        "status": "ok",
+        "deleted": deleted,
+        "resolved": resolved,
+        "slos_deleted": deleted_slos,
+        "errors": errors,
+        "total_found": deleted + errors,
+    }
 
 
 # ── Service Down simulation ─────────────────────────────────────
@@ -808,7 +871,13 @@ async def api_down(body: dict[str, Any]):
         async with httpx.AsyncClient(timeout=5) as c:
             r = await c.post(f"http://{host}/down", json={"duration": duration})
             data = r.json()
-        return {"status": "ok", "response": data, "service": service, "env": env, "duration": duration}
+        return {
+            "status": "ok",
+            "response": data,
+            "service": service,
+            "env": env,
+            "duration": duration,
+        }
     except Exception as e:
         return {"status": "error", "error": str(e), "service": service, "env": env}
 
@@ -816,7 +885,15 @@ async def api_down(body: dict[str, Any]):
 # ── Helper functions ────────────────────────────────────────────
 
 
-async def _send_dd_log(service: str, message: str, level: str = "info", extra_tags: str = "", source: str = "demo-ui", timestamp: int | None = None, env: str = "demo") -> int:
+async def _send_dd_log(
+    service: str,
+    message: str,
+    level: str = "info",
+    extra_tags: str = "",
+    source: str = "demo-ui",
+    timestamp: int | None = None,
+    env: str = "demo",
+) -> int:
     try:
         dd_tags = f"service:{service},env:{env},team:observai,purpose:demo"
         if CURRENT_SANDBOX_SESSION:
@@ -828,14 +905,26 @@ async def _send_dd_log(service: str, message: str, level: str = "info", extra_ta
             r = await c.post(
                 f"{DD_LOG_INTAKE}/api/v2/logs",
                 headers=_dd_headers(),
-                json=[{"ddsource": source, "ddtags": dd_tags, "hostname": service, "service": service, "message": message, "status": level, "timestamp": ts}],
+                json=[
+                    {
+                        "ddsource": source,
+                        "ddtags": dd_tags,
+                        "hostname": service,
+                        "service": service,
+                        "message": message,
+                        "status": level,
+                        "timestamp": ts,
+                    }
+                ],
             )
             return r.status_code
     except Exception:
         return 0
 
 
-async def _send_dd_event(service: str, title: str, text: str, alert_type: str = "info", tags: str = "", env: str = "demo") -> int:
+async def _send_dd_event(
+    service: str, title: str, text: str, alert_type: str = "info", tags: str = "", env: str = "demo"
+) -> int:
     try:
         dd_tags = [f"service:{service}", f"env:{env}", "team:observai", "purpose:demo"]
         if tags:
@@ -846,7 +935,14 @@ async def _send_dd_event(service: str, title: str, text: str, alert_type: str = 
             r = await c.post(
                 f"{DD_API_BASE}/api/v1/events",
                 headers=_dd_headers(),
-                json={"title": title, "text": text, "alert_type": alert_type, "tags": dd_tags, "host": service, "date_happened": int(time.time())},
+                json={
+                    "title": title,
+                    "text": text,
+                    "alert_type": alert_type,
+                    "tags": dd_tags,
+                    "host": service,
+                    "date_happened": int(time.time()),
+                },
             )
             return r.status_code
     except Exception:
@@ -895,7 +991,7 @@ async def seed_incidents(body: dict[str, Any]):
             # Datadog incidents v2 ignore attributes.tags, so scope the run via the title.
             sess_part = f" {session} " if session else " "
             base_title = f"[Sandbox]{sess_part}{name_prefix} — {svc} ({env})"
-            title = f"{base_title} — {random.choice(FAILURE_PATTERNS).replace('_',' ')} failure"
+            title = f"{base_title} — {random.choice(FAILURE_PATTERNS).replace('_', ' ')} failure"
             # Auto-severity based on environment
             effective_severity = severity
             if env == "prd":
@@ -916,7 +1012,7 @@ async def seed_incidents(body: dict[str, Any]):
                 dd_ui_base = f"https://{DD_SITE}"
                 logs_url = f"{dd_ui_base}/logs?query=service%3A{svc}%20env%3A{env}%20purpose%3Aincident&from_ts={start_ms}&to_ts={now_ms}&live=false"
                 events_url = f"{dd_ui_base}/event/explorer?query=service%3A{svc}%20env%3A{env}%20purpose%3Aincident&from_ts={start_ms}&to_ts={now_ms}&live=false"
-                impact_scope = f"{description[:80]} | Logs[{start_ms//1000}-{now_ms//1000}]: {logs_url} | Events: {events_url}"
+                impact_scope = f"{description[:80]} | Logs[{start_ms // 1000}-{now_ms // 1000}]: {logs_url} | Events: {events_url}"
                 dd_payload = {
                     "data": {
                         "type": "incidents",
@@ -962,9 +1058,17 @@ async def seed_incidents(body: dict[str, Any]):
                         r = await c.post(
                             f"{DD_LOG_INTAKE}/api/v2/logs",
                             headers=dd_headers,
-                            json=[{"ddsource": "incident-engine", "ddtags": tag_str,
-                                   "hostname": svc, "service": svc, "message": f"{base_title} | {log_msg}",
-                                   "status": log_status, "timestamp": log_ts}],
+                            json=[
+                                {
+                                    "ddsource": "incident-engine",
+                                    "ddtags": tag_str,
+                                    "hostname": svc,
+                                    "service": svc,
+                                    "message": f"{base_title} | {log_msg}",
+                                    "status": log_status,
+                                    "timestamp": log_ts,
+                                }
+                            ],
                         )
                         if str(r.status_code).startswith("2"):
                             ev["logs"] += 1
@@ -972,16 +1076,26 @@ async def seed_incidents(body: dict[str, Any]):
                         ev["errors"] += 1
 
                 # 2. Events
-                alert_map = {"SEV-1": "error", "SEV-2": "error", "SEV-3": "warning", "SEV-4": "warning", "SEV-5": "info"}
+                alert_map = {
+                    "SEV-1": "error",
+                    "SEV-2": "error",
+                    "SEV-3": "warning",
+                    "SEV-4": "warning",
+                    "SEV-5": "info",
+                }
                 for _ in range(random.randint(1, 3)):
                     try:
                         r = await c.post(
                             f"{DD_API_BASE}/api/v1/events",
                             headers=dd_headers,
-                            json={"title": base_title,
-                                  "text": f"{description} | {random.choice(ERROR_MSGS)}",
-                                  "alert_type": alert_map.get(severity, "error"), "tags": incident_tags,
-                                  "host": svc, "date_happened": int(time.time()) - random.randint(0, 120)},
+                            json={
+                                "title": base_title,
+                                "text": f"{description} | {random.choice(ERROR_MSGS)}",
+                                "alert_type": alert_map.get(severity, "error"),
+                                "tags": incident_tags,
+                                "host": svc,
+                                "date_happened": int(time.time()) - random.randint(0, 120),
+                            },
                         )
                         if str(r.status_code).startswith("2"):
                             ev["events"] += 1
@@ -989,16 +1103,34 @@ async def seed_incidents(body: dict[str, Any]):
                         ev["errors"] += 1
 
                 # 3. Metrics
-                metric_base = random.choice(["system.cpu.user", "system.mem.used", "net.bytes_sent"])
+                metric_base = random.choice(
+                    ["system.cpu.user", "system.mem.used", "net.bytes_sent"]
+                )
                 for pt in range(3):
                     try:
-                        val = round(random.uniform(50, 98), 1) if pt < 2 else round(random.uniform(80, 99.9), 1)
+                        val = (
+                            round(random.uniform(50, 98), 1)
+                            if pt < 2
+                            else round(random.uniform(80, 99.9), 1)
+                        )
                         r = await c.post(
                             f"{DD_API_BASE}/api/v2/series",
                             headers=dd_headers,
-                            json={"series": [{"metric": metric_base, "type": 0,
-                                              "points": [{"timestamp": int(time.time()) - (3-pt)*30, "value": val}],
-                                              "tags": incident_tags}]},
+                            json={
+                                "series": [
+                                    {
+                                        "metric": metric_base,
+                                        "type": 0,
+                                        "points": [
+                                            {
+                                                "timestamp": int(time.time()) - (3 - pt) * 30,
+                                                "value": val,
+                                            }
+                                        ],
+                                        "tags": incident_tags,
+                                    }
+                                ]
+                            },
                         )
                         if str(r.status_code).startswith("2"):
                             ev["metrics"] += 1
@@ -1012,11 +1144,14 @@ async def seed_incidents(body: dict[str, Any]):
                         r = await c.post(
                             f"{DD_API_BASE}/api/v1/monitor",
                             headers=dd_headers,
-                            json={"name": mon_name, "type": "query alert",
-                                  "query": f"avg(last_5m):avg:{metric_base}{{service:{svc}}} > 90",
-                                  "message": f"{description} | Evidence monitor for {title}",
-                                  "tags": incident_tags,
-                                  "options": {"thresholds": {"critical": 90, "warning": 75}}},
+                            json={
+                                "name": mon_name,
+                                "type": "query alert",
+                                "query": f"avg(last_5m):avg:{metric_base}{{service:{svc}}} > 90",
+                                "message": f"{description} | Evidence monitor for {title}",
+                                "tags": incident_tags,
+                                "options": {"thresholds": {"critical": 90, "warning": 75}},
+                            },
                         )
                         if r.status_code in (200, 201):
                             ev["monitors"] += 1
@@ -1033,12 +1168,30 @@ async def seed_incidents(body: dict[str, Any]):
             if interval and i < qty - 1:
                 await asyncio.sleep(_resolve_interval(interval))
 
-    await _send_dd_log("demo", f"Seeded incident \"{name_prefix}\" ({severity}) with evidence", "info")
+    await _send_dd_log(
+        "demo", f'Seeded incident "{name_prefix}" ({severity}) with evidence', "info"
+    )
     return {
         "status": "ok",
-        "incident": {"sent": ev["sent"], "incidents": ev.get("incidents", 0), "errors": ev["errors"], "severity": severity, "name": name_prefix},
-        "evidence": {"logs": ev["logs"], "events": ev["events"], "metrics": ev["metrics"], "monitors": ev["monitors"]},
-        "total": ev["logs"] + ev["events"] + ev["metrics"] + ev["monitors"] + ev["sent"] + ev.get("incidents", 0),
+        "incident": {
+            "sent": ev["sent"],
+            "incidents": ev.get("incidents", 0),
+            "errors": ev["errors"],
+            "severity": severity,
+            "name": name_prefix,
+        },
+        "evidence": {
+            "logs": ev["logs"],
+            "events": ev["events"],
+            "metrics": ev["metrics"],
+            "monitors": ev["monitors"],
+        },
+        "total": ev["logs"]
+        + ev["events"]
+        + ev["metrics"]
+        + ev["monitors"]
+        + ev["sent"]
+        + ev.get("incidents", 0),
     }
 
 
@@ -1060,9 +1213,16 @@ async def verify_events(body: dict[str, Any]):
                 params={"start": start_ts, "end": end_ts},
             )
         if r.status_code != 200:
-            return {"status": "error", "error": f"Datadog API returned {r.status_code}", "found": 0, "expected": expected}
+            return {
+                "status": "error",
+                "error": f"Datadog API returned {r.status_code}",
+                "found": 0,
+                "expected": expected,
+            }
         events = r.json().get("events", [])
-        matching = [e for e in events if title and title.split(" —")[0].strip() in e.get("title", "")]
+        matching = [
+            e for e in events if title and title.split(" —")[0].strip() in e.get("title", "")
+        ]
         found = len(matching)
         urls = []
         sample_titles = []
@@ -1072,11 +1232,29 @@ async def verify_events(body: dict[str, Any]):
                 urls.append(f"https://{DD_SITE}/event/event?id={eid}")
             sample_titles.append(e.get("title", "")[:60])
         if found >= expected:
-            return {"status": "ok", "found": found, "expected": expected, "urls": urls, "sample_titles": sample_titles}
+            return {
+                "status": "ok",
+                "found": found,
+                "expected": expected,
+                "urls": urls,
+                "sample_titles": sample_titles,
+            }
         elif found > 0:
-            return {"status": "partial", "found": found, "expected": expected, "urls": urls, "sample_titles": sample_titles}
+            return {
+                "status": "partial",
+                "found": found,
+                "expected": expected,
+                "urls": urls,
+                "sample_titles": sample_titles,
+            }
         else:
-            return {"status": "partial", "found": 0, "expected": expected, "urls": [], "sample_titles": []}
+            return {
+                "status": "partial",
+                "found": 0,
+                "expected": expected,
+                "urls": [],
+                "sample_titles": [],
+            }
     except Exception as e:
         return {"status": "error", "error": str(e), "found": 0, "expected": expected}
 
@@ -1095,7 +1273,13 @@ async def seed_self_check():
     try:
         async with httpx.AsyncClient(timeout=5) as c:
             r = await c.get(f"{DD_API_BASE}/api/v1/validate", headers={"DD-API-KEY": DD_API_KEY})
-        results["checks"].append({"name": "dd_api_connect", "status": "ok" if r.status_code == 200 else "error", "code": r.status_code})
+        results["checks"].append(
+            {
+                "name": "dd_api_connect",
+                "status": "ok" if r.status_code == 200 else "error",
+                "code": r.status_code,
+            }
+        )
         if r.status_code != 200:
             results["status"] = "degraded"
     except Exception as e:
@@ -1104,7 +1288,9 @@ async def seed_self_check():
     try:
         async with httpx.AsyncClient(timeout=3) as c:
             r = await c.get("http://test-runner:8003/health")
-        results["checks"].append({"name": "test_runner", "status": "ok" if r.status_code == 200 else "error"})
+        results["checks"].append(
+            {"name": "test_runner", "status": "ok" if r.status_code == 200 else "error"}
+        )
         if r.status_code != 200:
             results["status"] = "degraded"
     except Exception as e:
@@ -1120,16 +1306,34 @@ async def test_datadog_connection():
         async with httpx.AsyncClient(timeout=10) as c:
             r = await c.get(f"{DD_API_BASE}/api/v1/monitor", headers=_dd_headers())
         n_monitors = len(r.json()) if r.status_code == 200 else 0
-        results["checks"].append({"name": "monitors", "status": "ok" if r.status_code == 200 else "error", "total": n_monitors, "code": r.status_code})
+        results["checks"].append(
+            {
+                "name": "monitors",
+                "status": "ok" if r.status_code == 200 else "error",
+                "total": n_monitors,
+                "code": r.status_code,
+            }
+        )
     except Exception as e:
         results["checks"].append({"name": "monitors", "status": "error", "error": str(e)})
         results["status"] = "degraded"
     try:
         async with httpx.AsyncClient(timeout=10) as c:
-            r = await c.post(f"{DD_API_BASE}/api/v2/logs/events/search", headers={"DD-API-KEY": DD_API_KEY, "Content-Type": "application/json"}, json={"filter": {"from": "now-2h", "to": "now"}, "limit": 5})
+            r = await c.post(
+                f"{DD_API_BASE}/api/v2/logs/events/search",
+                headers={"DD-API-KEY": DD_API_KEY, "Content-Type": "application/json"},
+                json={"filter": {"from": "now-2h", "to": "now"}, "limit": 5},
+            )
         data = r.json() if r.status_code == 200 else {}
         n_logs = len(data.get("data", [])) if r.status_code == 200 else 0
-        results["checks"].append({"name": "logs_search", "status": "ok" if r.status_code == 200 else "error", "hits": n_logs, "code": r.status_code})
+        results["checks"].append(
+            {
+                "name": "logs_search",
+                "status": "ok" if r.status_code == 200 else "error",
+                "hits": n_logs,
+                "code": r.status_code,
+            }
+        )
     except Exception as e:
         results["checks"].append({"name": "logs_search", "status": "error", "error": str(e)})
         results["status"] = "degraded"
@@ -1137,7 +1341,14 @@ async def test_datadog_connection():
         async with httpx.AsyncClient(timeout=10) as c:
             r = await c.get(f"{DD_API_BASE}/api/v1/slo", headers=_dd_headers())
         n_slos = len(r.json().get("data", [])) if r.status_code == 200 else 0
-        results["checks"].append({"name": "slos", "status": "ok" if r.status_code == 200 else "error", "total": n_slos, "code": r.status_code})
+        results["checks"].append(
+            {
+                "name": "slos",
+                "status": "ok" if r.status_code == 200 else "error",
+                "total": n_slos,
+                "code": r.status_code,
+            }
+        )
     except Exception as e:
         results["checks"].append({"name": "slos", "status": "error", "error": str(e)})
         results["status"] = "degraded"
@@ -1147,7 +1358,15 @@ async def test_datadog_connection():
 @app.get("/smoke-test")
 async def smoke_test():
     results: dict[str, Any] = {"status": "ok", "tests": []}
-    for svc_name, port in [("user-service", 8001), ("user-service-dev", 8001), ("user-service-prd", 8001), ("api-gateway", 8002), ("api-gateway-dev", 8002), ("api-gateway-prd", 8002), ("test-runner", 8003)]:
+    for svc_name, port in [
+        ("user-service", 8001),
+        ("user-service-dev", 8001),
+        ("user-service-prd", 8001),
+        ("api-gateway", 8002),
+        ("api-gateway-dev", 8002),
+        ("api-gateway-prd", 8002),
+        ("test-runner", 8003),
+    ]:
         try:
             async with httpx.AsyncClient(timeout=3) as c:
                 r = await c.get(f"http://{svc_name}:{port}/health")

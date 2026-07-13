@@ -1,0 +1,7 @@
+e2e/.auth/
+node_modules/
+playwright-report/
+test-results/
+
+# Playwright auth state (contains live tokens)
+.auth/

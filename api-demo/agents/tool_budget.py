@@ -61,5 +61,5 @@ if __name__ == "__main__":
 
     for i in range(args.max + 2):
         ok = budget.allow_call()
-        print(f"  Call {i+1}: {'ALLOWED' if ok else 'REJECTED'}")
+        print(f"  Call {i + 1}: {'ALLOWED' if ok else 'REJECTED'}")
         time.sleep(0.05)

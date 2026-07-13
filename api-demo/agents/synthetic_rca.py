@@ -8,12 +8,10 @@ score.
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import Any
 
 from agents.langgraph_pipeline import run_pipeline
-
 
 _INCIDENTS_PATH = Path(__file__).resolve().parent.parent / "data" / "incidents.json"
 
@@ -61,11 +59,13 @@ async def evaluate_pipeline(
         if state.get("recommendation"):
             has_runbook += 1
 
-        results.append({
-            "id": inc_id,
-            "rca_match": rca_match,
-            "has_runbook": bool(state.get("recommendation")),
-        })
+        results.append(
+            {
+                "id": inc_id,
+                "rca_match": rca_match,
+                "has_runbook": bool(state.get("recommendation")),
+            }
+        )
 
     total = len(incidents)
     return {
@@ -81,7 +81,9 @@ if __name__ == "__main__":
     import argparse
     import asyncio
 
-    parser = argparse.ArgumentParser(description="Evaluate LangGraph pipeline against known incidents")
+    parser = argparse.ArgumentParser(
+        description="Evaluate LangGraph pipeline against known incidents"
+    )
     parser.add_argument("--data", help="Path to incidents JSON (default: data/incidents.json)")
     args = parser.parse_args()
 

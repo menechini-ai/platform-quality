@@ -18,28 +18,31 @@ from fastapi.responses import JSONResponse
 
 # ── OpenTelemetry tracing → otel-collector → Datadog (bypasses the Datadog Agent) ──
 from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 
 def _init_tracing() -> None:
     """Export spans over OTLP to the collector, which forwards them directly to Datadog."""
     provider = TracerProvider(
-        resource=Resource.create({
-            "service.name": SERVICE,
-            "deployment.environment": ENV,
-            "team": "observai",
-            "purpose": "demo",
-        })
+        resource=Resource.create(
+            {
+                "service.name": SERVICE,
+                "deployment.environment": ENV,
+                "team": "observai",
+                "purpose": "demo",
+            }
+        )
     )
     provider.add_span_processor(
         BatchSpanProcessor(OTLPSpanExporter(endpoint="http://otel-collector:4318/v1/traces"))
     )
     trace.set_tracer_provider(provider)
     FastAPIInstrumentor.instrument_app(app)
+
 
 # ── Config ────────────────────────────────────────────────────
 DD_API_KEY = os.environ.get("DATADOG_API_KEY", "")
@@ -81,15 +84,17 @@ async def _send_log(message: str, status: str = "info", correlation_id: str = ""
             await c.post(
                 f"{DD_LOGS_INTAKE}/api/v2/logs",
                 headers=_dd_headers(),
-                json=[{
-                    "ddsource": "python",
-                    "ddtags": tags,
-                    "hostname": SERVICE,
-                    "service": SERVICE,
-                    "message": message,
-                    "status": status,
-                    "timestamp": int(time.time() * 1000),
-                }],
+                json=[
+                    {
+                        "ddsource": "python",
+                        "ddtags": tags,
+                        "hostname": SERVICE,
+                        "service": SERVICE,
+                        "message": message,
+                        "status": status,
+                        "timestamp": int(time.time() * 1000),
+                    }
+                ],
             )
     except Exception:
         pass
@@ -102,12 +107,14 @@ async def _send_metric(name: str, value: float, mtype: str = "gauge") -> None:
                 f"{DD_API_BASE}/api/v2/series",
                 headers=_dd_headers(),
                 json={
-                    "series": [{
-                        "metric": f"{SERVICE}.{name}",
-                        "type": 1 if mtype == "count" else 0,
-                        "points": [{"timestamp": int(time.time()), "value": value}],
-                        "tags": _tag_list(),
-                    }],
+                    "series": [
+                        {
+                            "metric": f"{SERVICE}.{name}",
+                            "type": 1 if mtype == "count" else 0,
+                            "points": [{"timestamp": int(time.time()), "value": value}],
+                            "tags": _tag_list(),
+                        }
+                    ],
                 },
             )
     except Exception:
@@ -172,7 +179,15 @@ UPSTREAMS: dict[str, str] = {
 @app.get("/health")
 async def health():
     if time.time() < _down_until:
-        return JSONResponse({"service": SERVICE, "status": "down", "env": ENV, "down_for": round(_down_until - time.time(), 1)}, status_code=503)
+        return JSONResponse(
+            {
+                "service": SERVICE,
+                "status": "down",
+                "env": ENV,
+                "down_for": round(_down_until - time.time(), 1),
+            },
+            status_code=503,
+        )
     return {"service": SERVICE, "status": "ok", "env": ENV}
 
 
@@ -181,13 +196,20 @@ async def set_down(body: dict[str, Any] = {}):
     global _down_until
     duration = float(body.get("duration", 10))
     _down_until = time.time() + duration
-    return {"service": SERVICE, "env": ENV, "status": "degraded", "down_for_seconds": duration, "expected_recovery": duration}
+    return {
+        "service": SERVICE,
+        "env": ENV,
+        "status": "degraded",
+        "down_for_seconds": duration,
+        "expected_recovery": duration,
+    }
 
 
 @app.get("/health/check")
 async def health_check():
     """Deep health check — tests upstream user-service connectivity."""
     import time
+
     try:
         async with httpx.AsyncClient(timeout=5) as c:
             start = time.monotonic()
@@ -196,7 +218,11 @@ async def health_check():
             return {
                 "service": SERVICE,
                 "status": "ok" if resp.status_code == 200 else "degraded",
-                "upstream": {"service": "user-service", "status": resp.status_code, "latency_ms": round(elapsed, 1)},
+                "upstream": {
+                    "service": "user-service",
+                    "status": resp.status_code,
+                    "latency_ms": round(elapsed, 1),
+                },
             }
     except Exception as e:
         return {
@@ -227,7 +253,12 @@ async def gateway_list(upstream: str):
             await _send_metric("latency_ms", round(elapsed, 1))
             if resp.status_code >= 400:
                 await _send_metric("error_rate", 1.0)
-            return {"upstream": upstream, "correlation_id": cid, "status": resp.status_code, "data": data}
+            return {
+                "upstream": upstream,
+                "correlation_id": cid,
+                "status": resp.status_code,
+                "data": data,
+            }
     except Exception as e:
         elapsed = (time.monotonic() - start) * 1000
         await _send_log(
@@ -281,4 +312,5 @@ async def gateway_create(upstream: str, body: dict[str, Any]):
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8002)

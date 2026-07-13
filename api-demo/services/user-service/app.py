@@ -20,28 +20,31 @@ from fastapi.responses import JSONResponse
 
 # ── OpenTelemetry tracing → otel-collector → Datadog (bypasses the Datadog Agent) ──
 from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 
 def _init_tracing() -> None:
     """Export spans over OTLP to the collector, which forwards them directly to Datadog."""
     provider = TracerProvider(
-        resource=Resource.create({
-            "service.name": SERVICE,
-            "deployment.environment": ENV,
-            "team": "observai",
-            "purpose": "demo",
-        })
+        resource=Resource.create(
+            {
+                "service.name": SERVICE,
+                "deployment.environment": ENV,
+                "team": "observai",
+                "purpose": "demo",
+            }
+        )
     )
     provider.add_span_processor(
         BatchSpanProcessor(OTLPSpanExporter(endpoint="http://otel-collector:4318/v1/traces"))
     )
     trace.set_tracer_provider(provider)
     FastAPIInstrumentor.instrument_app(app)
+
 
 # ── Datadog config (from env or defaults) ─────────────────────
 DD_API_KEY = os.environ.get("DATADOG_API_KEY", "")
@@ -89,6 +92,7 @@ _init_db()
 
 # ── Helpers ───────────────────────────────────────────────────
 
+
 def _dd_headers() -> dict[str, str]:
     return {
         "DD-API-KEY": DD_API_KEY,
@@ -111,15 +115,17 @@ async def _send_log(message: str, status: str = "info") -> None:
             await c.post(
                 f"{DD_LOGS_INTAKE}/api/v2/logs",
                 headers=_dd_headers(),
-                json=[{
-                    "ddsource": "python",
-                    "ddtags": _tags(),
-                    "hostname": SERVICE,
-                    "service": SERVICE,
-                    "message": message,
-                    "status": status,
-                    "timestamp": int(time.time() * 1000),
-                }],
+                json=[
+                    {
+                        "ddsource": "python",
+                        "ddtags": _tags(),
+                        "hostname": SERVICE,
+                        "service": SERVICE,
+                        "message": message,
+                        "status": status,
+                        "timestamp": int(time.time() * 1000),
+                    }
+                ],
             )
     except Exception:
         pass  # best-effort
@@ -133,12 +139,14 @@ async def _send_metric(name: str, value: float, mtype: str = "gauge") -> None:
                 f"{DD_API_BASE}/api/v2/series",
                 headers=_dd_headers(),
                 json={
-                    "series": [{
-                        "metric": f"{SERVICE}.{name}",
-                        "type": 1 if mtype == "count" else 0,
-                        "points": [{"timestamp": int(time.time()), "value": value}],
-                        "tags": _tag_list(),
-                    }],
+                    "series": [
+                        {
+                            "metric": f"{SERVICE}.{name}",
+                            "type": 1 if mtype == "count" else 0,
+                            "points": [{"timestamp": int(time.time()), "value": value}],
+                            "tags": _tag_list(),
+                        }
+                    ],
                 },
             )
     except Exception:
@@ -175,7 +183,11 @@ async def _generate_traffic() -> None:
             await _send_metric("error_rate", round(random.uniform(0.5, 1.0), 4))
             await _send_metric("cpu_usage", 100.0)
             await _send_log(f"[{SERVICE}] SERVICE DOWN — all requests failing", "error")
-            await _send_event(f"[DOWN] {SERVICE} outage ({ENV})", "Service is down and returning 503 errors", "error")
+            await _send_event(
+                f"[DOWN] {SERVICE} outage ({ENV})",
+                "Service is down and returning 503 errors",
+                "error",
+            )
             continue
         await _send_metric("health", 1.0, "count")
         # Send some random latency
@@ -217,10 +229,19 @@ _init_tracing()
 
 # ── Routes ────────────────────────────────────────────────────
 
+
 @app.get("/health")
 async def health():
     if time.time() < _down_until:
-        return JSONResponse({"service": SERVICE, "status": "down", "env": ENV, "down_for": round(_down_until - time.time(), 1)}, status_code=503)
+        return JSONResponse(
+            {
+                "service": SERVICE,
+                "status": "down",
+                "env": ENV,
+                "down_for": round(_down_until - time.time(), 1),
+            },
+            status_code=503,
+        )
     return {"service": SERVICE, "status": "ok", "env": ENV}
 
 
@@ -229,7 +250,13 @@ async def set_down(body: dict[str, Any] = {}):
     global _down_until
     duration = float(body.get("duration", 10))
     _down_until = time.time() + duration
-    return {"service": SERVICE, "env": ENV, "status": "degraded", "down_for_seconds": duration, "expected_recovery": duration}
+    return {
+        "service": SERVICE,
+        "env": ENV,
+        "status": "degraded",
+        "down_for_seconds": duration,
+        "expected_recovery": duration,
+    }
 
 
 @app.get("/health/check")
@@ -250,7 +277,14 @@ async def list_users():
     rows = conn.execute("SELECT * FROM users ORDER BY created_at DESC").fetchall()
     conn.close()
     users = [
-        {"id": r[0], "name": r[1], "email": r[2], "role": r[3], "created_at": r[4], "updated_at": r[5]}
+        {
+            "id": r[0],
+            "name": r[1],
+            "email": r[2],
+            "role": r[3],
+            "created_at": r[4],
+            "updated_at": r[5],
+        }
         for r in rows
     ]
     await _send_log(f"GET /api/users — returned {len(users)} users", "info")
@@ -268,7 +302,14 @@ async def get_user(user_id: str):
         await _send_log(f"GET /api/users/{user_id} — user not found", "warn")
         await _send_metric("error_rate", 1.0)
         raise HTTPException(status_code=404, detail="User not found")
-    user = {"id": row[0], "name": row[1], "email": row[2], "role": row[3], "created_at": row[4], "updated_at": row[5]}
+    user = {
+        "id": row[0],
+        "name": row[1],
+        "email": row[2],
+        "role": row[3],
+        "created_at": row[4],
+        "updated_at": row[5],
+    }
     await _send_log(f"GET /api/users/{user_id} — user found", "info")
     await _send_metric("request_count", 1, "count")
     return user
@@ -328,4 +369,5 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8001)

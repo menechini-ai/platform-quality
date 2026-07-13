@@ -15,12 +15,12 @@ from typing import Any
 
 from litellm import completion
 
-
 DEFAULT_MODEL = os.getenv("LITELLM_DEFAULT_MODEL", "gpt-4o")
 
 # Wire Langfuse callback when credentials are available.
 if os.getenv("LANGFUSE_SECRET_KEY"):
     import litellm
+
     litellm.success_callback = ["langfuse"]  # type: ignore[assignment]
 
 
@@ -103,13 +103,13 @@ class LiteLLMClient:
         if inject_kb and self._vector_store is not None:
             kb_results = self._vector_store.search(prompt, k=kb_k)
             if kb_results:
-                kb_context = "\n".join(
-                    f"- {r['text']}" for r in kb_results
+                kb_context = "\n".join(f"- {r['text']}" for r in kb_results)
+                messages.append(
+                    {
+                        "role": "system",
+                        "content": f"Relevant knowledge base entries:\n{kb_context}",
+                    }
                 )
-                messages.append({
-                    "role": "system",
-                    "content": f"Relevant knowledge base entries:\n{kb_context}",
-                })
 
         messages.append({"role": "user", "content": prompt})
         resp = completion(
@@ -167,6 +167,7 @@ def main() -> None:
     client = LiteLLMClient()
     if args.kb:
         from lib.vectordb import VectorStore
+
         vs = VectorStore()
         vs.load_json("api-demo/data/kb_entries.json")
         client.attach_vector_store(vs)
