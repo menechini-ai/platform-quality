@@ -14,11 +14,11 @@ export function Pill({ children, tone = "default", className, title }: PillProps
       title={title}
       className={clsx(
         "pill inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono font-medium rounded",
-        tone === "good" && "pill-good bg-emerald-500/15 text-emerald-400 border border-emerald-500/30",
-        tone === "warn" && "pill-warn bg-amber-500/15 text-amber-400 border border-amber-500/30",
-        tone === "bad" && "pill-bad bg-red-500/15 text-red-400 border border-red-500/30",
-        tone === "accent" && "pill-accent bg-brand-500/15 text-brand-400 border border-brand-500/30",
-        tone === "default" && "bg-slate-700/50 text-slate-300 border border-slate-600/50",
+        tone === "good" && "pill-good bg-[rgb(var(--sev-ok)/0.15)] text-[rgb(var(--sev-ok))] border border-[rgb(var(--sev-ok)/0.3)]",
+        tone === "warn" && "pill-warn bg-[rgb(var(--sev-warn)/0.15)] text-[rgb(var(--sev-warn))] border border-[rgb(var(--sev-warn)/0.3)]",
+        tone === "bad" && "pill-bad bg-[rgb(var(--sev-critical)/0.15)] text-[rgb(var(--sev-critical))] border border-[rgb(var(--sev-critical)/0.3)]",
+        tone === "accent" && "pill-accent bg-[rgb(var(--brand)/0.15)] text-[rgb(var(--brand))] border border-[rgb(var(--brand)/0.3)]",
+        tone === "default" && "bg-[rgb(var(--ink-700)/0.5)] text-[rgb(var(--ink-300))] border border-[rgb(var(--ink-600)/0.5)]",
         className,
       )}
     >

@@ -10,7 +10,8 @@ import { clsx } from "clsx";
 
 import { SegmentedControl } from "@/components/common/SegmentedControl";
 import { Pill, SeverityBadge, StatusBadge, SourceBadge } from "@/components/common/Pill";
-import { BulkActionBar, RowSelectCheckbox, SelectAllCheckbox, useBulkSelection } from "@/components/common/BulkActionBar";
+import { BulkActionBar, RowSelectCheckbox, SelectAllCheckbox } from "@/components/common/BulkActionBar";
+import { useBulkSelection } from "@/hooks/useBulkSelection";
 import { PeekPanel, PeekField, PeekSection } from "@/components/common/PeekPanel";
 
 const severities = ["SEV-1", "SEV-2", "SEV-3", "SEV-4", "SEV-5"];
@@ -101,8 +102,8 @@ export function IncidentsPage() {
           defaultValue="all"
           options={[
             { value: "all", label: "All", badge: incidents?.length ?? 0 },
-            { value: "agent", label: "AI Detected", badge: incidents?.filter(i => i.source === "agent").length ?? 0 },
-            { value: "webhook", label: "Webhook", badge: incidents?.filter(i => i.source === "webhook").length ?? 0 },
+            { value: "agent", label: "AI Detected", badge: incidents?.filter((i) => i.source === "agent").length ?? 0 },
+            { value: "webhook", label: "Webhook", badge: incidents?.filter((i) => i.source === "webhook").length ?? 0 },
           ]}
           ariaLabel="Filter incidents by origin"
         />
@@ -115,7 +116,7 @@ export function IncidentsPage() {
             placeholder="Search by title, service, or #id..."
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 rounded-lg bg-surface-700 border border-slate-600/50 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-500/50 font-mono"
+            className="input w-full pl-9"
           />
         </div>
       </div>
@@ -146,10 +147,10 @@ export function IncidentsPage() {
                   setSearchParams(next, { replace: true });
                 }}
                 className={clsx(
-                  "px-2 py-0.5 rounded text-xs font-medium border transition-colors",
+                  "pill",
                   searchParams.get("severity") === s
-                    ? "bg-brand-500/20 text-brand-400 border-brand-500/30"
-                    : "text-slate-500 border-slate-600/50 hover:text-slate-300",
+                    ? "pill-accent"
+                    : "pill-default hover:pill-accent",
                 )}
               >
                 {s}
@@ -163,15 +164,15 @@ export function IncidentsPage() {
             <div className="animate-pulse text-slate-400 font-mono">Loading incidents...</div>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="glass rounded-xl p-12 text-center">
-            <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
+          <div className="card p-12 text-center">
+            <CheckCircle2 className="w-12 h-12 text-[rgb(var(--sev-ok))] mx-auto mb-3" />
             <p className="text-slate-400 font-mono text-sm">
               {hasFilters ? "No incidents match your filters" : "No incidents recorded yet"}
             </p>
             {hasFilters && (
               <button
                 onClick={clearFilters}
-                className="text-sm text-brand-400 hover:text-brand-300 mt-2 font-mono"
+                className="text-sm text-[rgb(var(--brand))] hover:text-[rgb(var(--brand))] mt-2 font-mono"
               >
                 Clear filters
               </button>
@@ -180,72 +181,76 @@ export function IncidentsPage() {
         ) : (
           <>
             {/* Table header */}
-            <div className="grid grid-cols-[40px_1fr_auto_auto_auto_40px] gap-3 px-2 pb-2 text-xs font-medium text-slate-500 border-b border-slate-700/50 font-mono">
-              <SelectAllCheckbox checked={bulk.allSelected} indeterminate={bulk.someSelected} onChange={bulk.toggleAll} />
-              <span>Service / Title</span>
-              <span className="w-24">Severity</span>
-              <span className="w-20">Status</span>
-              <span className="w-28">When</span>
-              <span>Source</span>
-            </div>
-
-            {/* Rows */}
-            <div className="space-y-1">
-              {filtered.map((inc) => {
-                const selected = bulk.isSelected(inc.id);
-                return (
-                  <div
-                    key={inc.id}
-                    onClick={() => {
-                      setPeekId(inc.id);
-                    }}
-                    className={clsx(
-                      "grid grid-cols-[40px_1fr_auto_auto_auto_40px] gap-3 px-2 py-2.5 rounded-lg",
-                      "transition-colors cursor-pointer",
-                      selected && "bg-brand-500/10 border border-brand-500/30",
-                      "hover:bg-surface-700/50",
-                    )}
-                  >
-                    <RowSelectCheckbox
-                      checked={selected}
-                      onChange={() => bulk.toggleOne(inc.id)}
-                      aria-label={`Select incident ${inc.title}`}
-                    />
-
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-medium text-white truncate">{inc.title || `#${inc.id.slice(0, 8)}`}</h3>
-                        {inc.source && <SourceBadge source={inc.source} />}
-                      </div>
-                      {inc.service && (
-                        <p className="text-xs text-slate-500 truncate font-mono">{inc.service}</p>
+            <div className="ddt">
+              <thead>
+                <tr>
+                  <th className="w-10"><SelectAllCheckbox checked={bulk.allSelected} indeterminate={bulk.someSelected} onChange={bulk.toggleAll} /></th>
+                  <th>Service / Title</th>
+                  <th className="w-24">Severity</th>
+                  <th className="w-20">Status</th>
+                  <th className="w-28">When</th>
+                  <th>Source</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((inc, idx) => {
+                  const selected = bulk.isSelected(inc.id);
+                  return (
+                    <tr
+                      key={inc.id}
+                      className={clsx(
+                        selected && "bg-[rgb(var(--brand)/0.1)]",
+                        "hover:bg-[rgb(var(--ink-700)/0.4)]",
+                        "cursor-pointer",
+                        "animate-row-in",
                       )}
-                      {inc.description && (
-                        <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{inc.description}</p>
-                      )}
-                    </div>
-
-                    <SeverityBadge severity={inc.severity} className="w-24 justify-center" />
-                    <StatusBadge status={inc.status} className="w-20 justify-center" />
-                    <span className="text-xs text-slate-400 font-mono w-28">
-                      {new Date(inc.started_at).toLocaleString()}
-                    </span>
-
-                    <div className="flex items-center justify-end pr-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPeekId(inc.id);
-                        }}
-                        className="p-1 rounded hover:bg-surface-700 text-slate-500 hover:text-white transition-colors"
-                        aria-label="View details"
-                      >
-                        <Eye size={14} />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+                      style={{ animationDelay: `${Math.min(idx, 11) * 25}ms` }}
+                      onClick={() => setPeekId(inc.id)}
+                    >
+                      <td className="w-10">
+                        <RowSelectCheckbox
+                          checked={selected}
+                          onChange={() => bulk.toggleOne(inc.id)}
+                          aria-label={`Select incident ${inc.title}`}
+                        />
+                      </td>
+                      <td className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-medium text-white truncate">{inc.title || `#${inc.id.slice(0, 8)}`}</h3>
+                          {inc.source && <SourceBadge source={inc.source} />}
+                        </div>
+                        {inc.service && (
+                          <p className="text-xs text-slate-500 truncate font-mono">{inc.service}</p>
+                        )}
+                        {inc.description && (
+                          <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{inc.description}</p>
+                        )}
+                      </td>
+                      <td className="w-24">
+                        <SeverityBadge severity={inc.severity} className="justify-center" />
+                      </td>
+                      <td className="w-20">
+                        <StatusBadge status={inc.status} className="justify-center" />
+                      </td>
+                      <td className="w-28 text-xs text-slate-400 font-mono">
+                        {new Date(inc.started_at).toLocaleString()}
+                      </td>
+                      <td className="flex items-center justify-end pr-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPeekId(inc.id);
+                          }}
+                          className="btn btn-ghost p-1"
+                          aria-label="View details"
+                        >
+                          <Eye size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
             </div>
 
             {/* Count footer */}
@@ -312,10 +317,10 @@ export function IncidentsPage() {
                 </PeekSection>
               )}
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-700/50">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[rgb(var(--ink-700)/0.5)]">
                 <button
                   onClick={() => navigate(`/incidents/${peek.id}`)}
-                  className="px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium"
+                  className="btn btn-primary"
                 >
                   Open Full Details
                 </button>
