@@ -1,5 +1,5 @@
 import { clsx } from "clsx";
-import { X, Check } from "lucide-react";
+import { X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 interface RowSelectCheckboxProps {
@@ -132,7 +132,9 @@ export function useBulkSelection<T extends { id: string }>({
     try {
       const saved = localStorage.getItem(storageKey);
       if (saved) return JSON.parse(saved);
-    } catch {}
+    } catch {
+      // ignore parse errors
+    }
     return [];
   });
 

@@ -2,8 +2,6 @@ import { useState, useMemo, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useIncidents } from "@/api/client";
 import {
-  AlertTriangle,
-  Clock,
   CheckCircle2,
   Search,
   Eye,
@@ -67,7 +65,10 @@ export function IncidentsPage() {
   );
 
   // Bulk selection
-  const bulk = useBulkSelection(filtered, `incidents|${origin}|${normalizedStatus}|${debouncedQ}`);
+  const bulk = useBulkSelection({
+    items: filtered,
+    storageKey: `incidents|${origin}|${normalizedStatus}|${debouncedQ}`,
+  });
 
   const handleBulkAction = (action: string) => {
     const ids = bulk.selectedIds;
