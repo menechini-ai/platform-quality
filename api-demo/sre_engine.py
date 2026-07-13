@@ -77,7 +77,7 @@ SCENARIOS: dict[str, dict[str, Any]] = {
             {"order": 5, "action": "File postmortem", "command": "add index + perf test"},
         ],
         "self_heal_action": {"type": "rollback", "config": {"target_version": "v2.1.4", "service": "api-gateway"}},
-        "monitor_query": "avg(last_5m):avg:api-gateway.latency_ms{*} > 800",
+        "monitor_query": "avg(last_5m):avg:system.cpu.user{service:api-gateway} > 80",
         "slo_target": 99.0,
         "mttr": MttrBreakdown("deploy", mttd_min=2, mtti_min=8, mttk_min=3, mtta_min=2, mttr_min=5),
     },
@@ -108,7 +108,7 @@ SCENARIOS: dict[str, dict[str, Any]] = {
             {"order": 4, "action": "Monitor recovery", "command": "check cpu < 80% for 5min"},
         ],
         "self_heal_action": {"type": "scale", "config": {"replicas": 10, "service": "payment-service"}},
-        "monitor_query": "avg(last_5m):avg:payment-service.cpu_usage{*} > 85",
+        "monitor_query": "avg(last_5m):avg:system.cpu.user{service:payment-service} > 85",
         "slo_target": 99.5,
         "mttr": MttrBreakdown("resource", mttd_min=5, mtti_min=10, mttk_min=5, mtta_min=3, mttr_min=10),
     },
@@ -139,7 +139,7 @@ SCENARIOS: dict[str, dict[str, Any]] = {
             {"order": 4, "action": "Verify recovery", "command": "check p99 < 200ms for 5min"},
         ],
         "self_heal_action": {"type": "script", "config": {"script": "pg_recreate_index_users_org.sh", "service": "user-service"}},
-        "monitor_query": "avg(last_5m):avg:user-service.latency_ms{*} > 2000",
+        "monitor_query": "avg(last_5m):avg:system.cpu.user{service:user-service} > 85",
         "slo_target": 99.0,
         "mttr": MttrBreakdown("latency", mttd_min=3, mtti_min=15, mttk_min=5, mtta_min=2, mttr_min=8),
     },
@@ -170,7 +170,7 @@ SCENARIOS: dict[str, dict[str, Any]] = {
             {"order": 4, "action": "Verify session recovery", "command": "check /api/auth endpoint"},
         ],
         "self_heal_action": {"type": "script", "config": {"script": "redis_failover.sh", "service": "redis"}},
-        "monitor_query": "avg(last_5m):avg:redis.mem.used_pct{*} > 90",
+        "monitor_query": "avg(last_5m):avg:system.cpu.user{service:api-gateway} > 85",
         "slo_target": 99.9,
         "mttr": MttrBreakdown("dependency", mttd_min=1, mtti_min=12, mttk_min=4, mtta_min=3, mttr_min=15),
     },
@@ -201,7 +201,7 @@ SCENARIOS: dict[str, dict[str, Any]] = {
             {"order": 4, "action": "Verify data integrity", "command": "SELECT count(*) FROM orders WHERE discount_pct IS NULL"},
         ],
         "self_heal_action": {"type": "script", "config": {"script": "rollback_migration_v4.sh", "service": "order-service"}},
-        "monitor_query": "avg(last_5m):avg:order-service.error_rate{*} > 5",
+        "monitor_query": "avg(last_5m):avg:system.cpu.user{service:order-service} > 85",
         "slo_target": 99.5,
         "mttr": MttrBreakdown("data_corruption", mttd_min=4, mtti_min=20, mttk_min=8, mtta_min=5, mttr_min=25),
     },
@@ -266,10 +266,18 @@ class DdClient:
                 "type": "incidents",
                 "attributes": {
                     "title": title, "severity": severity, "customer_impacted": severity in ("SEV-1", "SEV-2"),
-                    "fields": {"services": {"type": "string", "value": svc}},
+                    "description": f"Incident: {title}",
                 },
+                "relationships": {
+                    "services": {
+                        "data": [{"type": "services", "id": s.strip()} for s in svc.split(",") if s.strip()]
+                    }
+                }
             }
         }
+        if severity in ("SEV-1", "SEV-2"):
+            body["data"]["attributes"]["customer_impact_start"] = datetime.now(UTC).isoformat()
+            body["data"]["attributes"]["customer_impact_scope"] = "60% of authenticated users affected"
         return self._req("POST", f"{self.api_base}/api/v2/incidents", body)
 
 
@@ -440,6 +448,7 @@ def run_scenario(name: str, dd: DdClient) -> dict[str, Any]:
 
     # ── Phase 2: Create monitor in Datadog ──────────────────────
     print(f"  [2/6] Creating monitor + incident...")
+    time.sleep(3)  # wait for metrics to index
     mon = dd.create_monitor(
         f"SRE Demo — {cfg['title'][:60]}",
         cfg["monitor_query"],
@@ -574,7 +583,7 @@ def run_scenario(name: str, dd: DdClient) -> dict[str, Any]:
             slo_body = {
                 "type": "monitor",
                 "name": f"SRE Demo — {cfg['title'][:50]} SLO ({cfg['slo_target']}%)",
-                "thresholds": [{"target": cfg["slo_target"], "timeframe": "30d", "warning": cfg["slo_target"] - 2}],
+                "thresholds": [{"target": cfg["slo_target"], "timeframe": "30d", "warning": min(cfg["slo_target"] + 0.5, 99.95)}],
                 "monitor_ids": [mid],
                 "tags": tags,
             }
