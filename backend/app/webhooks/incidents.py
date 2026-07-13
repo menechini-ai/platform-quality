@@ -1,4 +1,5 @@
-"""Webhook incident ingestion (Versus parity: Alertmanager, Grafana, Sentry, CloudWatch, FluentBit)."""
+"""Webhook incident ingestion (Versus parity: Alertmanager, Grafana,
+Sentry, CloudWatch, FluentBit)."""
 
 from __future__ import annotations
 
@@ -360,8 +361,6 @@ def normalize_payload(source: str, payload: dict) -> list[NormalizedIncident]:
 @router.post("", status_code=201)
 async def receive_incident(
     request: Request,
-    oncall_enable: bool | None = None,
-    oncall_wait_minutes: int | None = None,
     _user: User = Depends(get_current_user),
 ):
     """

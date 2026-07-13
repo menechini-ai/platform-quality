@@ -92,6 +92,7 @@ class LogSource(BaseModel):
     enable: bool = True
     file: FileSourceConfig | None = None
     elasticsearch: ElasticsearchSourceConfig | None = None
+    rule_name: str | None = None
 
 
 class AgentConfig(BaseModel):
@@ -227,7 +228,7 @@ def load_config(path: str | Path | None = None) -> RootConfig:
     try:
         return RootConfig(**config_dict)
     except ValidationError as e:
-        raise ValueError(f"Config validation failed: {e}")
+        raise ValueError(f"Config validation failed: {e}") from e
 
 
 def load_agent_sources(path: str | Path) -> list[LogSource]:

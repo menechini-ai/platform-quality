@@ -90,9 +90,10 @@ class SlackChannel(NotificationChannel):
         ]
 
         if payload.tags:
+            tags_text = " ".join(f"`{t}`" for t in payload.tags[:10])
             blocks.append({
                 "type": "context",
-                "elements": [{"type": "mrkdwn", "text": " ".join(f"`{t}`" for t in payload.tags[:10])}],
+                "elements": [{"type": "mrkdwn", "text": tags_text}],
             })
 
         if payload.actions:
@@ -279,11 +280,11 @@ class OpsgenieChannel(NotificationChannel):
         }
 
         try:
-            resp = await self._client.post(
-                self.api_url,
-                json=alert,
-                headers={"Authorization": f"GenieKey {self.api_key}", "Content-Type": "application/json"},
-            )
+            headers = {
+                "Authorization": f"GenieKey {self.api_key}",
+                "Content-Type": "application/json",
+            }
+            resp = await self._client.post(self.api_url, json=alert, headers=headers)
             resp.raise_for_status()
             return True
         except Exception as e:
@@ -380,7 +381,9 @@ class NotificationManager:
                 results[ch.name] = False
         return results
 
-    async def notify_channels(self, payload: NotificationPayload, channel_names: list[str]) -> dict[str, bool]:
+    async def notify_channels(
+        self, payload: NotificationPayload, channel_names: list[str]
+    ) -> dict[str, bool]:
         """Send to specific channels."""
         results = {}
         for name in channel_names:
