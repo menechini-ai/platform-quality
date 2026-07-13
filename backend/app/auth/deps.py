@@ -1,8 +1,9 @@
 """JWT bearer dependency: validates signature, issuer, audience, and revocation."""
 
+import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
+from jwt import PyJWTError as JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.schemas import UserInfo

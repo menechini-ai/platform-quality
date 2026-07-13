@@ -3,9 +3,10 @@
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
+import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
+from jwt import PyJWTError as JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import get_current_user

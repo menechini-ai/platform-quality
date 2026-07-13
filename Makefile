@@ -80,8 +80,11 @@ typecheck:
 
 # ─── Safety ───────────────────────────────────────────────────────
 
+# `uv audit` was removed in uv 0.8+ and pip-audit needs a resolvable
+# virtualenv, so we scan the resolved deps against the OSV database.
 safety:
-	cd backend && uv pip list --format=json | uv audit --quiet || true
+	cd backend && uv export --format=requirements.txt -o /tmp/backend-reqs.txt && \
+		uv run python ../scripts/osv_audit.py /tmp/backend-reqs.txt
 
 # ─── Clean ────────────────────────────────────────────────────────
 
