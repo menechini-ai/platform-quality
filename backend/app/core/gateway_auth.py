@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fastapi import Depends, Header, HTTPException, Request, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.config_loader import load_config
 

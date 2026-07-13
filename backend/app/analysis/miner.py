@@ -3,11 +3,8 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import re
-from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any
 
 from app.core.config_loader import MinerConfig, load_config
 
@@ -16,7 +13,7 @@ from app.core.config_loader import MinerConfig, load_config
 class TrieNode:
     """Node in the prefix tree for log token clustering."""
 
-    children: dict[str, "TrieNode"] = field(default_factory=dict)
+    children: dict[str, TrieNode] = field(default_factory=dict)
     count: int = 0
     patterns: set[str] = field(default_factory=set)  # signature hashes
 

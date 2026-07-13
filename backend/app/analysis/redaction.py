@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import contextlib
 import re
-from typing import Pattern
+from re import Pattern
+from typing import Any
 
-from app.core.config_loader import load_config
+from app.core.config_loader import RedactionConfig, load_config
 
 
 class RedactionEngine:
@@ -40,10 +42,8 @@ class RedactionEngine:
         if self.config.redact_ips:
             patterns.append(re.compile(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b"))
         for p in self.config.extra_patterns:
-            try:
+            with contextlib.suppress(re.error):
                 patterns.append(re.compile(p))
-            except re.error:
-                pass  # skip invalid regex
         return patterns
 
     def redact(self, text: str) -> str:
@@ -53,7 +53,7 @@ class RedactionEngine:
             result = pattern.sub("[REDACTED]", result)
         return result
 
-    def redact_dict(self, data: dict) -> dict:
+    def redact_dict(self, data: dict[str, Any]) -> dict[str, Any]:
         """Redact sensitive fields in a dict recursively."""
         result = {}
         for k, v in data.items():
@@ -62,7 +62,11 @@ class RedactionEngine:
             elif isinstance(v, dict):
                 result[k] = self.redact_dict(v)
             elif isinstance(v, list):
-                result[k] = [self.redact_dict(i) if isinstance(i, dict) else (self.redact(i) if isinstance(i, str) else i) for i in v]
+                result[k] = [
+                    self.redact_dict(i) if isinstance(i, dict)
+                    else (self.redact(i) if isinstance(i, str) else i)
+                    for i in v
+                ]
             else:
                 result[k] = v
         return result
@@ -89,7 +93,7 @@ def redact_log_line(line: str) -> str:
     return get_redaction_engine().redact(line)
 
 
-def redact_for_llm(data: dict | str) -> dict | str:
+def redact_for_llm(data: dict[str, Any] | str) -> dict[str, Any] | str:
     """Redact data before sending to LLM."""
     engine = get_redaction_engine()
     if isinstance(data, str):

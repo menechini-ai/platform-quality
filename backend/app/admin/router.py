@@ -5,11 +5,16 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from app.analysis.agent_service import AgentService, get_agent, start_agent, stop_agent
-from app.core.gateway_auth import gateway_auth
+from app.analysis.agent_service import (
+    AgentMode,
+    get_agent,
+    start_agent,
+    stop_agent,
+)
 from app.core.config_loader import load_config
+from app.core.gateway_auth import gateway_auth
 
-router = APIRouter(prefix="/api/admin", dependencies=[Depends(gateway_auth)])
+router = APIRouter(dependencies=[Depends(gateway_auth)])
 
 
 class SourceStatus(BaseModel):
@@ -47,16 +52,25 @@ async def agent_status():
 async def agent_sources():
     """Get configured log sources and their cursor positions."""
     agent = get_agent()
-    return [
-        SourceStatus(
-            name=s.name,
-            type=s.type.value,
-            enable=s.enable,
-            cursor_position=agent.cursors.get(s.name, SourceCursor(source_name=s.name)).last_position if s.name in agent.cursors else None,
-            last_timestamp=agent.cursors.get(s.name, SourceCursor(source_name=s.name)).es_scroll_id if s.name in agent.cursors else None,
+    result = []
+    for s in agent.sources:
+        cursor = agent.cursors.get(s.name)
+        if cursor:
+            pos = cursor.last_position
+            ts = cursor.es_scroll_id
+        else:
+            pos = None
+            ts = None
+        result.append(
+            SourceStatus(
+                name=s.name,
+                type=s.type.value,
+                enable=s.enable,
+                cursor_position=pos,
+                last_timestamp=ts,
+            )
         )
-        for s in agent.sources
-    ]
+    return result
 
 
 @router.post("/agent/start")
@@ -80,7 +94,6 @@ async def agent_set_mode(mode: str = Query(..., pattern="^(training|shadow|detec
     if agent.mode.value == mode:
         return {"status": "unchanged", "mode": mode}
 
-    # Only allow mode transitions: training -> shadow -> detect
     valid_transitions = {
         "training": ["shadow", "detect"],
         "shadow": ["detect", "training"],
@@ -90,7 +103,6 @@ async def agent_set_mode(mode: str = Query(..., pattern="^(training|shadow|detec
     if mode not in valid_transitions.get(agent.mode.value, []):
         raise HTTPException(400, f"Invalid mode transition from {agent.mode.value} to {mode}")
 
-    # Restart agent with new mode
     await stop_agent()
     agent.mode = AgentMode(mode)
     await start_agent()
@@ -110,7 +122,6 @@ async def agent_patterns(
     agent = get_agent()
     patterns = agent.miner.get_all_patterns()
 
-    # Filter
     if source:
         patterns = [p for p in patterns if p.get("source_name") == source]
     if rule:
@@ -118,7 +129,6 @@ async def agent_patterns(
     if status:
         patterns = [p for p in patterns if p.get("status") == status]
 
-    # Paginate
     return {
         "total": len(patterns),
         "limit": limit,

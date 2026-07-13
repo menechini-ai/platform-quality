@@ -92,7 +92,7 @@ class AgentIncident(Base):
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=dict)
 
-    pattern: Mapped["PatternCatalog"] = relationship("PatternCatalog", lazy="selectin")
+    pattern: Mapped[PatternCatalog] = relationship("PatternCatalog", lazy="selectin")
 
 
 class AgentSourceCursor(Base):

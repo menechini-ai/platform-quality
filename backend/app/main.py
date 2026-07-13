@@ -65,6 +65,8 @@ def create_app() -> FastAPI:
     )
 
     # Routers
+    # New routers (Versus parity)
+    from app.admin.router import router as admin_router
     from app.agents.router import router as agents_router
     from app.analysis.router import router as analysis_router
     from app.auth.router import router as auth_router
@@ -89,9 +91,6 @@ def create_app() -> FastAPI:
     from app.maturity.router_reports import router as reports_router
     from app.rca.router import router as rca_router
     from app.self_healing.router import router as self_healing_router
-
-    # New routers (Versus parity)
-    from app.admin.router import router as admin_router
     from app.webhooks.incidents import router as webhook_incidents_router
 
     prefix = settings.API_V1_PREFIX

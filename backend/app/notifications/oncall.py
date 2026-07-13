@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import subprocess
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING
 
 import httpx
 
-from app.core.models.incident import Incident
+if TYPE_CHECKING:
+    from app.core.models.incident import Incident
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +20,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class OnCallConfig:
     """On-call configuration."""
+
     initialized_only: bool = True
     enable: bool = False
     wait_minutes: int = 3
@@ -81,13 +84,14 @@ class PagerDutyOnCall(OnCallProvider):
         }
 
         try:
-            resp = await self._client.post("https://events.pagerduty.com/v2/enqueue", json=event)
+            resp = await self._client.post(
+                "https://events.pagerduty.com/v2/enqueue", json=event
+            )
             resp.raise_for_status()
-            data = resp.json()
-            logger.info(f"PagerDuty on-call triggered: {data}")
+            logger.info("PagerDuty on-call triggered for incident %s", incident.id)
             return True
         except Exception as e:
-            logger.error(f"PagerDuty on-call trigger failed: {e}")
+            logger.error("PagerDuty on-call trigger failed: %s", e)
             return False
 
     async def trigger_with_override(self, incident: Incident, env: str) -> bool:
@@ -108,26 +112,29 @@ class PagerDutyOnCall(OnCallProvider):
             },
         }
         try:
-            resp = await self._client.post("https://events.pagerduty.com/v2/enqueue", json=event)
+            resp = await self._client.post(
+                "https://events.pagerduty.com/v2/enqueue", json=event
+            )
             resp.raise_for_status()
             return True
         except Exception as e:
-            logger.error(f"PagerDuty override trigger failed: {e}")
+            logger.error("PagerDuty override trigger failed: %s", e)
             return False
 
     async def acknowledge(self, incident_id: str) -> bool:
-        # PagerDuty uses Events API for ack via resolve
         event = {
             "routing_key": self.routing_key,
             "event_action": "acknowledge",
             "dedup_key": f"oncall-{incident_id}",
         }
         try:
-            resp = await self._client.post("https://events.pagerduty.com/v2/enqueue", json=event)
+            resp = await self._client.post(
+                "https://events.pagerduty.com/v2/enqueue", json=event
+            )
             resp.raise_for_status()
             return True
         except Exception as e:
-            logger.error(f"PagerDuty ack failed: {e}")
+            logger.error("PagerDuty ack failed: %s", e)
             return False
 
 
@@ -143,73 +150,72 @@ class AWSIncidentManagerOnCall(OnCallProvider):
         self.response_plan_arn = response_plan_arn
         self.other_plans = other_plans or {}
         self.region = region
-        self._client = httpx.AsyncClient(timeout=10.0)
 
     @property
     def name(self) -> str:
         return "aws_incident_manager"
 
     async def trigger_oncall(self, incident: Incident, wait_minutes: int = 0) -> bool:
-        # Use AWS CLI via subprocess since boto3 is heavy
-        import subprocess
-        import json
-
         title = f"[ON-CALL] {incident.title}"
-        detail = {
-            "incident_id": str(incident.id),
-            "service": incident.service,
-            "severity": incident.severity,
-            "description": incident.description,
-            "tags": incident.tags,
-        }
 
         cmd = [
-            "aws", "ssm-incidents", "start-incident",
-            "--response-plan-arn", self.response_plan_arn,
-            "--title", title,
-            "--client-token", str(incident.id),
-            "--related-items", json.dumps([{
-                "identifier": {"type": "ARN", "value": f"arn:aws:events:{self.region}:*:rule/observai-incident"},
-                "title": "ObservAI Incident",
-            }]),
+            "aws",
+            "ssm-incidents",
+            "start-incident",
+            "--response-plan-arn",
+            self.response_plan_arn,
+            "--title",
+            title,
+            "--client-token",
+            str(incident.id),
+            "--related-items",
+            json.dumps([
+                {
+                    "identifier": {
+                        "type": "ARN",
+                        "value": f"arn:aws:events:{self.region}:*:rule/observai-incident"
+                    },
+                    "title": "ObservAI Incident",
+                }
+            ]),
         ]
 
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             if result.returncode == 0:
-                logger.info(f"AWS Incident Manager triggered: {result.stdout}")
+                logger.info("AWS Incident Manager triggered: %s", result.stdout)
                 return True
-            logger.error(f"AWS Incident Manager failed: {result.stderr}")
+            logger.error("AWS Incident Manager failed: %s", result.stderr)
             return False
         except Exception as e:
-            logger.error(f"AWS Incident Manager trigger failed: {e}")
+            logger.error("AWS Incident Manager trigger failed: %s", e)
             return False
 
     async def trigger_with_override(self, incident: Incident, env: str) -> bool:
         plan_arn = self.other_plans.get(env, self.response_plan_arn)
         title = f"[ON-CALL-{env.upper()}] {incident.title}"
 
-        import subprocess
-        import json
-
         cmd = [
-            "aws", "ssm-incidents", "start-incident",
-            "--response-plan-arn", plan_arn,
-            "--title", title,
-            "--client-token", f"{incident.id}-{env}",
+            "aws",
+            "ssm-incidents",
+            "start-incident",
+            "--response-plan-arn",
+            plan_arn,
+            "--title",
+            title,
+            "--client-token",
+            f"{incident.id}-{env}",
         ]
 
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             return result.returncode == 0
         except Exception as e:
-            logger.error(f"AWS Incident Manager override failed: {e}")
+            logger.error("AWS Incident Manager override failed: %s", e)
             return False
 
     async def acknowledge(self, incident_id: str) -> bool:
-        # AWS Incident Manager doesn't have direct ack via API easily
-        # Would need to use update-incident or related-items
-        logger.info(f"AWS Incident Manager ack for {incident_id} - manual in console")
+        logger.info("AWS Incident Manager ack for %s - manual in console", incident_id)
         return True
 
 
@@ -239,24 +245,27 @@ class OnCallManager:
                 region=aws_config.get("region", "us-east-1"),
             )
         else:
-            logger.warning(f"Unknown on-call provider: {config.provider}")
+            logger.warning("Unknown on-call provider: %s", config.provider)
 
-    async def maybe_trigger_oncall(self, incident: Incident, wait_minutes: int | None = None) -> bool:
+    async def maybe_trigger_oncall(
+        self, incident: Incident, wait_minutes: int | None = None
+    ) -> bool:
         """Trigger on-call if conditions met."""
         if not self.config or not self.config.enable:
             return False
 
-        # Check if initialized_only mode - only trigger if explicitly enabled
         if self.config.initialized_only:
-            # In Versus, this means don't auto-trigger unless query param says so
-            # Here we check if wait_minutes was explicitly provided (override)
             if wait_minutes is None:
                 return False
 
         wait_time = wait_minutes if wait_minutes is not None else self.config.wait_minutes
 
         if self.provider:
-            logger.info(f"Triggering on-call via {self.provider.name} for incident {incident.id}")
+            logger.info(
+                "Triggering on-call via %s for incident %s",
+                self.provider.name,
+                incident.id,
+            )
             return await self.provider.trigger_oncall(incident, wait_time)
 
         return False
@@ -266,9 +275,7 @@ class OnCallManager:
         if not self.config or not self.config.enable or not self.provider:
             return False
 
-        if isinstance(self.provider, PagerDutyOnCall):
-            return await self.provider.trigger_with_override(incident, env)
-        elif isinstance(self.provider, AWSIncidentManagerOnCall):
+        if isinstance(self.provider, (PagerDutyOnCall, AWSIncidentManagerOnCall)):
             return await self.provider.trigger_with_override(incident, env)
 
         return False

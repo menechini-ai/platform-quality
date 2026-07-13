@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -11,7 +11,7 @@ import yaml
 from pydantic import BaseModel, Field, ValidationError
 
 
-class AgentMode(str, Enum):
+class AgentMode(StrEnum):
     """AI SRE Agent modes."""
 
     TRAINING = "training"
@@ -19,7 +19,7 @@ class AgentMode(str, Enum):
     DETECT = "detect"
 
 
-class LogSourceType(str, Enum):
+class LogSourceType(StrEnum):
     """Log source types."""
 
     FILE = "file"
@@ -101,6 +101,7 @@ class AgentConfig(BaseModel):
     mode: AgentMode = AgentMode.TRAINING
     poll_interval: str = "30s"
     sources_path: str = "./agent_sources.yaml"
+    sources: list[LogSource] = Field(default_factory=list)
     catalog: CatalogConfig = Field(default_factory=CatalogConfig)
     redaction: RedactionConfig = Field(default_factory=RedactionConfig)
     miner: MinerConfig = Field(default_factory=MinerConfig)

@@ -3,18 +3,17 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import re
-from dataclasses import dataclass, field
-from datetime import UTC, datetime
-from enum import Enum
+from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
-from typing import Any
 
 import aiofiles
 import httpx
 
-from app.analysis.miner import PatternMiner, get_miner
+from app.analysis.miner import get_miner
 from app.analysis.redaction import get_redaction_engine, redact_log_line
 from app.core.config_loader import (
     AgentConfig,
@@ -29,7 +28,7 @@ from app.core.models.incident import Incident, IncidentTimeline
 logger = logging.getLogger(__name__)
 
 
-class AgentState(str, Enum):
+class AgentState(StrEnum):
     STOPPED = "stopped"
     RUNNING = "running"
     ERROR = "error"
@@ -78,9 +77,13 @@ class AgentService:
             self._poll_interval = self._parse_interval(self.config.poll_interval)
             self._auto_promote_threshold = self.config.catalog.auto_promote_after
             self.state = AgentState.RUNNING
-            logger.info(f"Agent initialized in {self.mode.value} mode with {len(self.sources)} sources")
+            logger.info(
+                "Agent initialized in %s mode with %d sources",
+                self.mode.value,
+                len(self.sources),
+            )
         except Exception as e:
-            logger.error(f"Agent init failed: {e}")
+            logger.error("Agent init failed: %s", e)
             self.state = AgentState.ERROR
             raise
 
@@ -108,10 +111,8 @@ class AgentService:
         self.state = AgentState.STOPPED
         if self._task and not self._task.done():
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
         logger.info("Agent stopped")
 
     async def _poll_loop(self) -> None:
@@ -121,7 +122,7 @@ class AgentService:
                 for source in self.sources:
                     await self._process_source(source)
             except Exception as e:
-                logger.error(f"Poll loop error: {e}")
+                logger.error("Poll loop error: %s", e)
             await asyncio.sleep(self._poll_interval)
 
     async def _process_source(self, source: LogSource) -> None:
@@ -132,20 +133,22 @@ class AgentService:
         elif source.type == LogSourceType.ELASTICSEARCH:
             await self._process_es_source(source, cursor)
 
-    async def _process_file_source(self, source: LogSource, cursor: SourceCursor | None) -> None:
+    async def _process_file_source(
+        self, source: LogSource, cursor: SourceCursor | None
+    ) -> None:
         """Read new lines from file source."""
         if not source.file:
             return
         path = Path(source.file.path)
         if not path.exists():
-            logger.warning(f"Log file not found: {path}")
+            logger.warning("Log file not found: %s", path)
             return
 
         if cursor is None:
             cursor = SourceCursor(source_name=source.name, file_path=str(path))
             self.cursors[source.name] = cursor
 
-        async with aiofiles.open(path, "r") as f:
+        async with aiofiles.open(path) as f:
             await f.seek(cursor.last_position)
             lines = await f.readlines()
             cursor.last_position = await f.tell()
@@ -156,7 +159,9 @@ class AgentService:
                 continue
             await self._process_line(line, source.name, source)
 
-    async def _process_es_source(self, source: AgentSource, cursor: SourceCursor | None) -> None:
+    async def _process_es_source(
+        self, source: LogSource, cursor: SourceCursor | None
+    ) -> None:
         """Query Elasticsearch for new log entries."""
         if not source.elasticsearch:
             return
@@ -170,7 +175,15 @@ class AgentService:
             "query": {
                 "bool": {
                     "must": [{"query_string": {"query": es.query}}],
-                    "filter": [{"range": {es.time_field: {"gt": cursor.last_timestamp or "now-1h"}}}],
+                    "filter": [
+                        {
+                            "range": {
+                                es.time_field: {
+                                    "gt": cursor.last_timestamp or "now-1h"
+                                }
+                            }
+                        }
+                    ],
                 }
             },
             "sort": [{es.time_field: "asc"}],
@@ -221,14 +234,19 @@ class AgentService:
         if default and re.search(default, line, re.IGNORECASE):
             return True
 
-        return False if (rules or default) else True  # If no rules, match all
+        return not (rules or default)  # If no rules, match all
 
-    async def _create_incident_from_pattern(self, pattern: dict, source_name: str) -> None:
+    async def _create_incident_from_pattern(
+        self, pattern: dict, source_name: str
+    ) -> None:
         """Create incident for previously unseen pattern."""
         async with async_session_factory() as session:
             incident = Incident(
                 title=f"New anomaly detected: {pattern.get('rule_name', 'unknown pattern')}",
-                description=f"AI SRE Agent detected a previously unseen log pattern from {source_name}.\n\nExample: {pattern['example_line'][:500]}",
+                description=(
+                    f"AI SRE Agent detected a previously unseen log pattern from "
+                    f"{source_name}.\n\nExample: {pattern['example_line'][:500]}"
+                ),
                 severity="SEV-3",  # Default, LLM can refine
                 status="active",
                 service=source_name,
@@ -243,13 +261,18 @@ class AgentService:
             timeline = IncidentTimeline(
                 incident_id=incident.id,
                 event_type="created",
-                content=f"Auto-detected by AI SRE Agent. Pattern: {pattern['hash']}. Source: {source_name}",
+                content=(
+                    f"Auto-detected by AI SRE Agent. Pattern: {pattern['hash']}. "
+                    f"Source: {source_name}"
+                ),
                 author="ai-sre-agent",
             )
             session.add(timeline)
             await session.commit()
 
-            logger.warning(f"Created incident {incident.id} for new pattern {pattern['hash']}")
+            logger.warning(
+                "Created incident %s for new pattern %s", incident.id, pattern["hash"]
+            )
 
     def get_stats(self) -> dict:
         """Get agent statistics."""

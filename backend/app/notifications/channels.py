@@ -5,12 +5,14 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING
 
 import httpx
 
-from app.core.models.incident import Incident
+if TYPE_CHECKING:
+    from datetime import datetime
+
+    from app.core.models.incident import Incident
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +20,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class NotificationPayload:
     """Standard notification payload."""
+
     incident: Incident
     title: str
     message: str
@@ -74,7 +77,10 @@ class SlackChannel(NotificationChannel):
                     {"type": "mrkdwn", "text": f"*Severity:*\n{payload.severity}"},
                     {"type": "mrkdwn", "text": f"*Source:*\n{payload.source}"},
                     {"type": "mrkdwn", "text": f"*Service:*\n{payload.incident.service or 'N/A'}"},
-                    {"type": "mrkdwn", "text": f"*Time:*\n{payload.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}"},
+                    {
+                        "type": "mrkdwn",
+                        "text": f"*Time:*\n{payload.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}",
+                    },
                 ],
             },
             {
@@ -90,14 +96,9 @@ class SlackChannel(NotificationChannel):
             })
 
         if payload.actions:
-            blocks.append({
-                "type": "actions",
-                "elements": payload.actions,
-            })
+            blocks.append({"type": "actions", "elements": payload.actions})
 
-        data = {
-            "attachments": [{"color": color, "blocks": blocks}],
-        }
+        data = {"attachments": [{"color": color, "blocks": blocks}]}
         if self.channel:
             data["channel"] = self.channel
 
@@ -106,7 +107,7 @@ class SlackChannel(NotificationChannel):
             resp.raise_for_status()
             return True
         except Exception as e:
-            logger.error(f"Slack notification failed: {e}")
+            logger.error("Slack notification failed: %s", e)
             return False
 
 
@@ -161,7 +162,7 @@ class TeamsChannel(NotificationChannel):
             resp.raise_for_status()
             return True
         except Exception as e:
-            logger.error(f"Teams notification failed: {e}")
+            logger.error("Teams notification failed: %s", e)
             return False
 
 
@@ -201,7 +202,7 @@ class TelegramChannel(NotificationChannel):
             resp.raise_for_status()
             return True
         except Exception as e:
-            logger.error(f"Telegram notification failed: {e}")
+            logger.error("Telegram notification failed: %s", e)
             return False
 
 
@@ -244,7 +245,7 @@ class PagerDutyChannel(NotificationChannel):
             resp.raise_for_status()
             return True
         except Exception as e:
-            logger.error(f"PagerDuty notification failed: {e}")
+            logger.error("PagerDuty notification failed: %s", e)
             return False
 
 
@@ -286,7 +287,7 @@ class OpsgenieChannel(NotificationChannel):
             resp.raise_for_status()
             return True
         except Exception as e:
-            logger.error(f"Opsgenie notification failed: {e}")
+            logger.error("Opsgenie notification failed: %s", e)
             return False
 
 
@@ -309,6 +310,7 @@ class EmailChannel(NotificationChannel):
         self.password = password
         self.from_email = from_email
         self.to_emails = to_emails
+        self.use_tls = use_tls
 
     @property
     def name(self) -> str:
@@ -316,16 +318,15 @@ class EmailChannel(NotificationChannel):
 
     async def send(self, payload: NotificationPayload) -> bool:
         import smtplib
-        from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
 
         msg = MIMEMultipart()
         msg["From"] = self.from_email
         msg["To"] = ", ".join(self.to_emails)
         msg["Subject"] = f"[{payload.severity}] {payload.title}"
 
-        body = f"""
-Incident Alert
+        body = f"""Incident Alert
 
 Title: {payload.title}
 Severity: {payload.severity}
@@ -349,7 +350,7 @@ Incident ID: {payload.incident.id}
                 server.send_message(msg)
             return True
         except Exception as e:
-            logger.error(f"Email notification failed: {e}")
+            logger.error("Email notification failed: %s", e)
             return False
 
 
@@ -375,7 +376,7 @@ class NotificationManager:
             try:
                 results[ch.name] = await ch.send(payload)
             except Exception as e:
-                logger.error(f"Channel {ch.name} failed: {e}")
+                logger.error("Channel %s failed: %s", ch.name, e)
                 results[ch.name] = False
         return results
 
@@ -388,7 +389,7 @@ class NotificationManager:
                 try:
                     results[name] = await ch.send(payload)
                 except Exception as e:
-                    logger.error(f"Channel {name} failed: {e}")
+                    logger.error("Channel %s failed: %s", name, e)
                     results[name] = False
             else:
                 results[name] = False
