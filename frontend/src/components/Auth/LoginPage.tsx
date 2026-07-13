@@ -25,7 +25,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bgmocha-base px-4">
+    <div className="min-h-screen flex items-center justify-center bg-mocha-base px-4">
       <form onSubmit={handleSubmit} className="glass rounded-xl p-8 w-full max-w-sm space-y-5">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-indigo-500/20 flex items-center justify-center">
@@ -38,7 +38,7 @@ export function LoginPage() {
           <input
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="w-full rounded-lg bgmocha-mantle border bordermocha-crust px-3 py-2 text-slate-100 outline-none focus:border-indigo-400"
+            className="w-full rounded-lg bg-mocha-mantle border border-mocha-crust px-3 py-2 text-slate-100 outline-none focus:border-indigo-400"
             autoFocus
           />
         </div>
@@ -48,7 +48,7 @@ export function LoginPage() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-lg bgmocha-mantle border bordermocha-crust px-3 py-2 text-slate-100 outline-none focus:border-indigo-400"
+            className="w-full rounded-lg bg-mocha-mantle border border-mocha-crust px-3 py-2 text-slate-100 outline-none focus:border-indigo-400"
           />
         </div>
         {error && <p className="text-sm text-red-400">{error}</p>}
