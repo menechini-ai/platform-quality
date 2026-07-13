@@ -119,7 +119,11 @@ def create_app() -> FastAPI:
     app.include_router(datadog_kit_router, prefix=prefix, tags=["datadog-investigate"])
     app.include_router(feedback_router, prefix=prefix, tags=["feedback"])
     app.include_router(admin_router, prefix=prefix, tags=["admin"])
-    app.include_router(webhook_incidents_router, prefix="", tags=["webhook-incidents"])  # No prefix for Versus compatibility
+    app.include_router(
+        webhook_incidents_router,
+        prefix="",
+        tags=["webhook-incidents"],
+    )  # No prefix for Versus compatibility
 
     @app.get("/health")
     async def health_check():

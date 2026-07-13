@@ -1,5 +1,4 @@
 """Gateway Secret authentication (Versus parity)."""
-
 from __future__ import annotations
 
 from fastapi import Depends, Header, HTTPException, Request, status
@@ -23,11 +22,11 @@ async def verify_gateway_secret(
     """
     try:
         config = load_config()
-    except Exception:
+    except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Configuration not loaded",
-        ) from None
+        ) from e
 
     expected = config.gateway_secret
     if not expected:
@@ -49,11 +48,6 @@ async def verify_gateway_secret(
         )
 
     return True
-
-
-def require_gateway_secret():
-    """Dependency that requires valid gateway secret."""
-    return Depends(verify_gateway_secret)
 
 
 # Alias for common usage

@@ -168,7 +168,9 @@ class AgentService:
 
         es = source.elasticsearch
         url = f"{es.addresses[0]}/{es.index}/_search"
-        auth = (es.username, es.password) if es.username else None
+        auth: tuple[str, str] | None = None
+        if es.username and es.password:
+            auth = (es.username, es.password)
 
         query = {
             "size": es.page_size,
@@ -179,7 +181,9 @@ class AgentService:
                         {
                             "range": {
                                 es.time_field: {
-                                    "gt": cursor.last_timestamp or "now-1h"
+                                    "gt": cursor.last_timestamp
+                                    if cursor and cursor.last_timestamp
+                                    else "now-1h"
                                 }
                             }
                         }
@@ -200,7 +204,7 @@ class AgentService:
             if msg:
                 await self._process_line(msg, source.name, source)
 
-        if hits:
+        if cursor and cursor.last_timestamp:
             cursor.last_timestamp = hits[-1]["_source"].get(es.time_field)
 
     async def _process_line(self, line: str, source_name: str, source: LogSource) -> None:
@@ -213,7 +217,7 @@ class AgentService:
             return
 
         # 3. Feed to miner
-        sig_hash = self.miner.insert(redacted, source_name, source.rule_name)
+        sig_hash = self.miner.insert(redacted, source_name, source.rule_name or "")
 
         # 4. In detect mode, check if pattern is new
         if self.mode == AgentMode.DETECT:
@@ -224,6 +228,8 @@ class AgentService:
 
     def _matches_regex_filter(self, line: str) -> bool:
         """Check if line matches any regex rule or default pattern."""
+        if not self.config or not self.config.regex:
+            return True
         rules = self.config.regex.rules
         default = self.config.regex.default_pattern
 

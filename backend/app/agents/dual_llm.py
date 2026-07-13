@@ -3,7 +3,6 @@
 Reads ``OPENAI_API_KEY`` first, falls back to ``LITELLM_API_KEY``,
 then ``app.core.config.settings.OPENAI_API_KEY``.
 """
-
 from __future__ import annotations
 
 import os
@@ -15,10 +14,7 @@ from app.core.config import settings
 
 
 def _pick_api_key() -> str:
-    """Return the first available API key.
-
-    Falls back: OPENAI_API_KEY > LITELLM_API_KEY > settings.OPENAI_API_KEY.
-    """
+    """Return first available key: OPENAI_API_KEY > LITELLM_API_KEY > settings.OPENAI_API_KEY."""
     return (
         os.getenv("OPENAI_API_KEY")
         or os.getenv("LITELLM_API_KEY")
@@ -31,21 +27,24 @@ def get_reasoning_model() -> ChatOpenAI:
     """Return ChatOpenAI for reasoning (gpt-4o, temperature=0)."""
     api_key = _pick_api_key()
     base_url = os.getenv("OPENAI_BASE_URL") or getattr(settings, "LITELLM_BASE_URL", None)
-    return ChatOpenAI(
-        model=os.getenv("LITELLM_DEFAULT_MODEL", "gpt-4o"),
-        temperature=0,
-        api_key=SecretStr(api_key),
-        base_url=base_url,
-    )
+    kwargs = {
+        "model": os.getenv("LITELLM_DEFAULT_MODEL", "gpt-4o"),
+        "temperature": 0,
+    }
+    if api_key:
+        kwargs["api_key"] = SecretStr(api_key)
+    if base_url:
+        kwargs["base_url"] = base_url
+    return ChatOpenAI(**kwargs)
 
 
 def get_tool_model() -> ChatOpenAI:
     """Return ChatOpenAI for tool calls (gpt-4o-mini, temperature=0)."""
     api_key = _pick_api_key()
     base_url = os.getenv("OPENAI_BASE_URL") or getattr(settings, "LITELLM_BASE_URL", None)
-    return ChatOpenAI(
-        model="gpt-4o-mini",
-        temperature=0,
-        api_key=SecretStr(api_key),
-        base_url=base_url,
-    )
+    kwargs = {"model": "gpt-4o-mini", "temperature": 0}
+    if api_key:
+        kwargs["api_key"] = SecretStr(api_key)
+    if base_url:
+        kwargs["base_url"] = base_url
+    return ChatOpenAI(**kwargs)

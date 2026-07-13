@@ -73,6 +73,7 @@ class LogSource(BaseModel):
     enable: bool = True
     file: FileSourceConfig | None = None
     elasticsearch: ElasticsearchSourceConfig | None = None
+    rule_name: str | None = None
 
 
 class AgentConfig(BaseModel):

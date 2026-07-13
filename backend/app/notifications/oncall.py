@@ -38,7 +38,7 @@ class OnCallProvider(ABC):
         pass
 
     @abstractmethod
-    async def trigger_oncall(self, incident: Incident, wait_minutes: int = 0) -> bool:
+    async def trigger_oncall(self, incident: Incident, _wait_minutes: int = 0) -> bool:
         """Trigger on-call escalation. Returns success."""
         pass
 
@@ -60,7 +60,7 @@ class PagerDutyOnCall(OnCallProvider):
     def name(self) -> str:
         return "pagerduty"
 
-    async def trigger_oncall(self, incident: Incident, wait_minutes: int = 0) -> bool:
+    async def trigger_oncall(self, incident: Incident, _wait_minutes: int = 0) -> bool:
         severity_map = {"SEV-1": "critical", "SEV-2": "error", "SEV-3": "warning", "SEV-4": "info"}
 
         event = {
@@ -78,7 +78,7 @@ class PagerDutyOnCall(OnCallProvider):
                     "incident_id": str(incident.id),
                     "description": incident.description,
                     "tags": incident.tags,
-                    "wait_minutes": wait_minutes,
+                    "wait_minutes": _wait_minutes,
                 },
             },
         }
