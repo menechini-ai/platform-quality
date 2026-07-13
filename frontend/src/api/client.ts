@@ -293,6 +293,7 @@ export interface Incident {
   severity: string;
   status: string;
   service?: string;
+  source?: string;
   started_at: string;
   resolved_at?: string;
   created_at: string;
