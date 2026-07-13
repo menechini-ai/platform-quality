@@ -79,7 +79,7 @@ class ElasticsearchSourceConfig(BaseModel):
     password: str | None = None
     index: str
     time_field: str = "@timestamp"
-    query: str = 'log.level:(error OR warn)'
+    query: str = "log.level:(error OR warn)"
     message_field: str = "message"
     page_size: int = 500
 
@@ -227,7 +227,7 @@ def load_config(path: str | Path | None = None) -> RootConfig:
     try:
         return RootConfig(**config_dict)
     except ValidationError as e:
-        raise ValueError(f"Config validation failed: {e}")
+        raise ValueError(f"Config validation failed: {e}") from e
 
 
 def load_agent_sources(path: str | Path) -> list[LogSource]:

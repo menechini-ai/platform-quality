@@ -84,9 +84,7 @@ class PagerDutyOnCall(OnCallProvider):
         }
 
         try:
-            resp = await self._client.post(
-                "https://events.pagerduty.com/v2/enqueue", json=event
-            )
+            resp = await self._client.post("https://events.pagerduty.com/v2/enqueue", json=event)
             resp.raise_for_status()
             logger.info("PagerDuty on-call triggered for incident %s", incident.id)
             return True
@@ -112,9 +110,7 @@ class PagerDutyOnCall(OnCallProvider):
             },
         }
         try:
-            resp = await self._client.post(
-                "https://events.pagerduty.com/v2/enqueue", json=event
-            )
+            resp = await self._client.post("https://events.pagerduty.com/v2/enqueue", json=event)
             resp.raise_for_status()
             return True
         except Exception as e:
@@ -128,9 +124,7 @@ class PagerDutyOnCall(OnCallProvider):
             "dedup_key": f"oncall-{incident_id}",
         }
         try:
-            resp = await self._client.post(
-                "https://events.pagerduty.com/v2/enqueue", json=event
-            )
+            resp = await self._client.post("https://events.pagerduty.com/v2/enqueue", json=event)
             resp.raise_for_status()
             return True
         except Exception as e:
@@ -155,7 +149,7 @@ class AWSIncidentManagerOnCall(OnCallProvider):
     def name(self) -> str:
         return "aws_incident_manager"
 
-    async def trigger_oncall(self, incident: Incident, wait_minutes: int = 0) -> bool:
+    async def trigger_oncall(self, incident: Incident, _wait_minutes: int = 0) -> bool:
         title = f"[ON-CALL] {incident.title}"
 
         cmd = [
@@ -169,15 +163,17 @@ class AWSIncidentManagerOnCall(OnCallProvider):
             "--client-token",
             str(incident.id),
             "--related-items",
-            json.dumps([
-                {
-                    "identifier": {
-                        "type": "ARN",
-                        "value": f"arn:aws:events:{self.region}:*:rule/observai-incident"
-                    },
-                    "title": "ObservAI Incident",
-                }
-            ]),
+            json.dumps(
+                [
+                    {
+                        "identifier": {
+                            "type": "ARN",
+                            "value": f"arn:aws:events:{self.region}:*:rule/observai-incident",
+                        },
+                        "title": "ObservAI Incident",
+                    }
+                ]
+            ),
         ]
 
         try:
@@ -254,9 +250,8 @@ class OnCallManager:
         if not self.config or not self.config.enable:
             return False
 
-        if self.config.initialized_only:
-            if wait_minutes is None:
-                return False
+        if self.config.initialized_only and wait_minutes is None:
+            return False
 
         wait_time = wait_minutes if wait_minutes is not None else self.config.wait_minutes
 

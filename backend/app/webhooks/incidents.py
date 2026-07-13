@@ -1,4 +1,7 @@
-"""Webhook incident ingestion (Versus parity: Alertmanager, Grafana, Sentry, CloudWatch, FluentBit)."""
+"""Webhook incident ingestion (Versus parity).
+
+Supports Alertmanager, Grafana, Sentry, CloudWatch SNS, and FluentBit sources.
+"""
 
 from __future__ import annotations
 
@@ -157,9 +160,7 @@ def normalize_alertmanager(payload: AlertmanagerPayload) -> list[NormalizedIncid
                 source_id=alert.labels.get("alertname", ""),
                 labels=alert.labels,
                 annotations=alert.annotations,
-                started_at=datetime.fromisoformat(
-                    alert.starts_at.replace("Z", "+00:00")
-                ),
+                started_at=datetime.fromisoformat(alert.starts_at.replace("Z", "+00:00")),
                 service=alert.labels.get("service") or alert.labels.get("instance"),
                 failure_pattern=alert.labels.get("alertname"),
                 tags=["alertmanager", alert.status] + list(alert.labels.keys()),
@@ -190,9 +191,7 @@ def normalize_grafana(payload: GrafanaPayload) -> list[NormalizedIncident]:
                 source_id=alert.labels.get("alertname", ""),
                 labels=alert.labels,
                 annotations=alert.annotations,
-                started_at=datetime.fromisoformat(
-                    alert.starts_at.replace("Z", "+00:00")
-                ),
+                started_at=datetime.fromisoformat(alert.starts_at.replace("Z", "+00:00")),
                 service=alert.labels.get("service") or alert.labels.get("instance"),
                 failure_pattern=alert.labels.get("alertname"),
                 tags=["grafana", alert.status] + list(alert.labels.keys()),
@@ -245,9 +244,7 @@ def normalize_cloudwatch(payload: CloudWatchPayload) -> list[NormalizedIncident]
                     source_id=msg["AlarmName"],
                     labels={"region": msg.get("Region", ""), "state": state},
                     annotations={"reason": msg.get("NewStateReason", "")},
-                    started_at=datetime.fromisoformat(
-                        payload.Timestamp.replace("Z", "+00:00")
-                    ),
+                    started_at=datetime.fromisoformat(payload.Timestamp.replace("Z", "+00:00")),
                     service=msg.get("Trigger", {}).get("Dimensions", [{}])[0].get("value"),
                     failure_pattern=msg.get("AlarmName"),
                     tags=["cloudwatch", state],
@@ -278,8 +275,7 @@ def normalize_fluentbit(payload: FluentBitPayload) -> list[NormalizedIncident]:
         log_line = record.log
         # Simple heuristic: only process error/fatal/critical logs
         if not any(
-            kw in log_line.lower()
-            for kw in ["error", "fatal", "critical", "exception", "panic"]
+            kw in log_line.lower() for kw in ["error", "fatal", "critical", "exception", "panic"]
         ):
             continue
 
@@ -360,8 +356,8 @@ def normalize_payload(source: str, payload: dict) -> list[NormalizedIncident]:
 @router.post("", status_code=201)
 async def receive_incident(
     request: Request,
-    oncall_enable: bool | None = None,
-    oncall_wait_minutes: int | None = None,
+    oncall_enable: bool | None = None,  # noqa
+    oncall_wait_minutes: int | None = None,  # noqa
     _user: User = Depends(get_current_user),
 ):
     """
@@ -404,8 +400,7 @@ async def receive_incident(
                 incident_id=incident.id,
                 event_type="created",
                 content=(
-                    f"Received from {inc.source} "
-                    f"(source_id: {inc.source_id}). Labels: {inc.labels}"
+                    f"Received from {inc.source} (source_id: {inc.source_id}). Labels: {inc.labels}"
                 ),
                 author=f"webhook-{inc.source}",
             )

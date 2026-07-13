@@ -77,9 +77,8 @@ class PatternMiner:
             if existing_token == token:
                 return existing_token
             # For structural tokens (<IP>, <NUM>, etc.), exact match only
-            if token.startswith("<") and existing_token.startswith("<"):
-                if token == existing_token:
-                    return existing_token
+            if token.startswith("<") and existing_token.startswith("<") and token == existing_token:
+                return existing_token
         return None
 
     def insert(self, line: str, source_name: str, rule_name: str | None = None) -> str:
