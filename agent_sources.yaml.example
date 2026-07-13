@@ -1,0 +1,27 @@
+# Agent log sources (separate file for per-environment management)
+# Path: ./agent_sources.yaml or set AGENT_SOURCES_PATH
+
+sources:
+  # File-based source (local logs)
+  - name: app-logs
+    type: file
+    enable: true
+    file:
+      path: ./logs/app.log
+      format: text
+      from_beginning: true
+
+  # Elasticsearch source (production)
+  - name: prod-elasticsearch
+    type: elasticsearch
+    enable: false
+    elasticsearch:
+      addresses:
+        - https://es.example.internal:9200
+      username: ${ES_USERNAME}
+      password: ${ES_PASSWORD}
+      index: "logs-app-*"
+      time_field: "@timestamp"
+      query: 'log.level:(error OR warn OR fatal OR panic)'
+      message_field: message
+      page_size: 500

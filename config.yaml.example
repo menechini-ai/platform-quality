@@ -1,0 +1,101 @@
+name: observai
+host: 0.0.0.0
+port: 8000
+public_host: https://observai.example.com
+
+# Root-level secret for admin/agent endpoints
+# Set GATEWAY_SECRET env var in production
+gateway_secret: ${GATEWAY_SECRET}
+
+# Storage backend for patterns and incidents
+storage:
+  type: file  # file | redis | database
+  file:
+    max_incidents: 1000
+
+# AI SRE Agent Configuration (Versus parity)
+agent:
+  enable: false  # Enable via AGENT_ENABLE=true
+  mode: training  # training | shadow | detect
+  poll_interval: 30s
+  sources_path: ./agent_sources.yaml
+
+  # Pattern catalog persistence
+  catalog:
+    persist_interval: 30s
+    auto_promote_after: 100  # sightings before "known"
+
+  # Redaction rules (applied before LLM sees logs)
+  redaction:
+    enable: true
+    redact_ips: false
+    extra_patterns:
+      - "(?i)password=\\S+"
+      - "Authorization: Bearer \\S+"
+
+  # Miner/clustering configuration
+  miner:
+    similarity_threshold: 0.4
+    tree_depth: 4
+    max_children: 100
+
+  # Regex pre-filter (only these signals go to miner)
+  regex:
+    default_pattern: "(?i)error|exception|fatal|panic"
+    rules:
+      - name: oom
+        pattern: "(?i)out of memory|OOMKilled|java\\.lang\\.OutOfMemoryError"
+      - name: db-timeout
+        pattern: "(?i)(connection|query) timeout|deadlock detected"
+      - name: auth-failure
+        pattern: "(?i)401 unauthorized|invalid credentials|permission denied"
+
+# Redis for cursor persistence (required for agent)
+redis:
+  host: ${REDIS_HOST}
+  port: ${REDIS_PORT}
+  password: ${REDIS_PASSWORD}
+  db: 0
+
+# On-call escalation
+oncall:
+  initialized_only: true
+  enable: false
+  wait_minutes: 3
+  provider: pagerduty  # pagerduty | aws_incident_manager
+  pagerduty:
+    routing_key: ${PAGERDUTY_ROUTING_KEY}
+    other_routing_keys:
+      prod: ${PAGERDUTY_ROUTING_KEY_PROD}
+      staging: ${PAGERDUTY_ROUTING_KEY_STAGING}
+  aws_incident_manager:
+    response_plan_arn: ${AWS_IM_RESPONSE_PLAN_ARN}
+    other_response_plan_arns:
+      prod: ${AWS_IM_RESPONSE_PLAN_ARN_PROD}
+      dev: ${AWS_IM_RESPONSE_PLAN_ARN_DEV}
+    region: us-east-1
+
+# Notification channels
+notifications:
+  slack:
+    webhook_url: ${SLACK_WEBHOOK_URL}
+    channel: "#incidents"
+  teams:
+    webhook_url: ${TEAMS_WEBHOOK_URL}
+  telegram:
+    bot_token: ${TELEGRAM_BOT_TOKEN}
+    chat_id: ${TELEGRAM_CHAT_ID}
+  pagerduty:
+    routing_key: ${PAGERDUTY_ROUTING_KEY}
+  opsgenie:
+    api_key: ${OPSGENIE_API_KEY}
+    api_url: https://api.opsgenie.com/v2/alerts
+  email:
+    smtp_host: ${SMTP_HOST}
+    smtp_port: 587
+    username: ${SMTP_USER}
+    password: ${SMTP_PASS}
+    from_email: ${SMTP_FROM}
+    to_emails:
+      - ${ALERT_EMAIL}
+    use_tls: true

@@ -90,6 +90,10 @@ def create_app() -> FastAPI:
     from app.rca.router import router as rca_router
     from app.self_healing.router import router as self_healing_router
 
+    # New routers (Versus parity)
+    from app.admin.router import router as admin_router
+    from app.webhooks.incidents import router as webhook_incidents_router
+
     prefix = settings.API_V1_PREFIX
     app.include_router(auth_router, prefix=prefix, tags=["auth"])
     app.include_router(incidents_router, prefix=prefix, tags=["incidents"])
@@ -115,6 +119,8 @@ def create_app() -> FastAPI:
     app.include_router(agents_router, prefix=prefix, tags=["agents"])
     app.include_router(datadog_kit_router, prefix=prefix, tags=["datadog-investigate"])
     app.include_router(feedback_router, prefix=prefix, tags=["feedback"])
+    app.include_router(admin_router, prefix=prefix, tags=["admin"])
+    app.include_router(webhook_incidents_router, prefix="", tags=["webhook-incidents"])  # No prefix for Versus compatibility
 
     @app.get("/health")
     async def health_check():
