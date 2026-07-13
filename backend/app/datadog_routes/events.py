@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, HTTPException, Query
 
 from app.datadog.client import DatadogClient
@@ -32,28 +34,30 @@ async def list_events(
     human: bool = Query(False, alias="human"),
 ):
     """List Datadog events with optional filters."""
-    from datetime import UTC, datetime
-
     composed = compose_filters(DatadogFilter(tags=tags, period=period))
     fkw = to_domain_kwargs("events", composed)
 
-    kwargs: dict[str, Any] = {}
-    if priority:
-        kwargs["priority"] = priority
-    if sources:
-        kwargs["sources"] = sources.replace(",", ",")
-    if "tags" in fkw:
-        kwargs["tags"] = fkw["tags"]
-
-    client = DatadogClient()
-    # SDK requires start/end; default to last 24h, override with period when given
     now = int(datetime.now(UTC).timestamp())
-    r = client.events.list_events(
-        start=fkw.get("start", start or now - 86400),
-        end=fkw.get("end", end or now),
-        **kwargs,
-    )
-    data = r.to_dict()
+    params: dict[str, Any] = {
+        "start": fkw.get("start", start or now - 86400),
+        "end": fkw.get("end", end or now),
+    }
+    if priority:
+        params["priority"] = priority
+    if sources:
+        params["sources"] = sources
+    if "tags" in fkw:
+        params["tags"] = fkw["tags"]
+
+    url = f"{get_datadog_url()}/api/v1/events"
+    try:
+        resp = httpx.get(url, headers=get_headers(), params=params, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        status, detail = friendly_datadog_error(e)
+        raise HTTPException(status_code=status, detail=detail) from e
+
     return maybe_human(data, fmt_events, human)
 
 
@@ -94,8 +98,6 @@ async def create_event(
 async def update_event(event_id: int, title: str | None = None, text: str | None = None):
     """Update an existing event."""
     assert_write_allowed()
-    import httpx
-
     body: dict[str, Any] = {}
     if title is not None:
         body["title"] = title
@@ -115,8 +117,6 @@ async def update_event(event_id: int, title: str | None = None, text: str | None
 async def delete_event(event_id: int):
     """Delete an event."""
     assert_write_allowed()
-    import httpx
-
     try:
         async with httpx.AsyncClient() as hc:
             url = f"{get_datadog_url()}/api/v1/events/{event_id}"
