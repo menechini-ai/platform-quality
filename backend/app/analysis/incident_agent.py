@@ -71,23 +71,27 @@ async def analyze_incident(
     sw_start = datetime.fromtimestamp(from_ts, tz=UTC)
     sw_end = datetime.fromtimestamp(to_ts, tz=UTC)
 
-    # 2. Query Datadog events
+    # 2. Query Datadog events via raw HTTP (SDK deserialization bug)
     dd_events = []
     try:
-        events = client.events.list_events(
-            start=from_ts,
-            end=to_ts,
-            tags=incident.service or "",
+        base = get_datadog_url()
+        headers = get_headers()
+        ev_resp = httpx.get(
+            f"{base}/api/v1/events",
+            headers=headers,
+            params={"start": from_ts, "to": to_ts, "tags": _service_filter(incident)},
+            timeout=10,
         )
-        dd_events = events.to_dict().get("events", [])
-        findings.append(
-            {
-                "type": "datadog_events",
-                "count": len(dd_events),
-                "severity": "info",
-                "detail": f"{len(dd_events)} events in window [-30m,+15m]",
-            }
-        )
+        if ev_resp.status_code == 200:
+            dd_events = ev_resp.json().get("events", [])
+            findings.append(
+                {
+                    "type": "datadog_events",
+                    "count": len(dd_events),
+                    "severity": "info",
+                    "detail": f"{len(dd_events)} events in window [-30m,+15m]",
+                }
+            )
     except Exception as e:
         logger.warning("Datadog events query failed: %s", e)
 
