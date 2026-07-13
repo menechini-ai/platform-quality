@@ -261,7 +261,7 @@ cd backend && alembic upgrade head
 make dev-backend       # uvicorn app.main:app --reload --port 8000
 
 # Start frontend (new terminal)
-make dev-frontend      # vite dev server → http://localhost:5173
+make dev-frontend      # vite dev server → http://localhost:3000
 ```
 
 Once running, the interactive OpenAPI docs are at **http://localhost:8000/docs**.
